@@ -7,12 +7,9 @@ from tensorflow.contrib import ffmpeg
 from model import model, timeslice_size, samples_per_second
 
 x = tf.placeholder(tf.float32, shape=(None, timeslice_size))
-encoder, decoder = model()
+encoded, decoded = model(x)
 
-encoded = encoder(x)
-noisy_encoded = tf.random_normal(tf.shape(encoded), stddev=1e-5)
-
-mse = tf.reduce_mean(tf.square(x - decoder(noisy_encoded)))
+mse = tf.reduce_mean(tf.square(x - decoded))
 # cost = tf.reduce_mean(
 #     tf.nn.softmax_cross_entropy_with_logits(labels=x, logits=decoder(
 #         encoder(x))))
@@ -49,7 +46,7 @@ i_test = i_total[n_train:]
 print(np.mean(waveform[i_train]), np.std(waveform[i_train]))
 
 # waveform = tf.constant(np.random.randn(n_total))
-n_epochs = 5
+n_epochs = 20
 
 saver = tf.train.Saver()
 with tf.Session() as session:
