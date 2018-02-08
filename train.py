@@ -4,10 +4,10 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from model import model, timeslice_size, samples_per_second
+from model import Model, timeslice_size, samples_per_second
 
 x = tf.placeholder(tf.float32, shape=(None, timeslice_size))
-encoded, decoded = model(x)
+encoded, decoded = Model(x)
 
 mse = tf.reduce_mean(tf.square(x - decoded))
 optimiser = tf.train.AdamOptimizer()

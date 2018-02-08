@@ -2,11 +2,11 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from model import model, samples_per_second, timeslice_size
+from model import Model, samples_per_second, timeslice_size
 
 n = 10 * (samples_per_second // timeslice_size)
 random_encoded = tf.constant(np.ones((n, 50)) + 0.001 * np.random.randn(n, 50), dtype=tf.float32)
-encoder, decoder = model()
+encoder, decoder = Model()
 slices_output = decoder(random_encoded)
 audio_output = tf.reshape(slices_output, (-1, 1))
 

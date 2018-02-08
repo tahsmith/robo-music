@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from model import model, samples_per_second, timeslice_size
+from model import Model, samples_per_second, timeslice_size
 
 
 input_file = tf.read_file(r'./bensound-goinghigher.mp3')
@@ -14,7 +14,7 @@ input_data = tf.reshape(
     tf.slice(input_data, [0, 0], [input_len - input_len % timeslice_size, 1]),
     [-1, timeslice_size])
 
-encoded, decoded = model(input_data)
+encoded, decoded = Model(input_data)
 slices_output = decoded
 output_data = tf.reshape(slices_output, (-1, 1))
 output_wav = ffmpeg.encode_audio(output_data, file_format='wav',
