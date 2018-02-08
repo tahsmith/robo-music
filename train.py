@@ -10,11 +10,21 @@ x = tf.placeholder(tf.float32, shape=(None, timeslice_size))
 encoded, decoded = model(x)
 
 mse = tf.reduce_mean(tf.square(x - decoded))
-# cost = tf.reduce_mean(
-#     tf.nn.softmax_cross_entropy_with_logits(labels=x, logits=decoder(
-#         encoder(x))))
 optimiser = tf.train.AdamOptimizer()
-op = optimiser.minimize(mse)
+
+
+def norm(z):
+    im = tf.imag(z)
+    re = tf.real(z)
+    return im * im + re * re
+
+
+# power_x = norm(tf.spectral.rfft(x))
+# power_decoded = norm(tf.spectral.rfft(decoded))
+# spectral_error = tf.abs(power_x - power_decoded)
+cost = mse
+
+op = optimiser.minimize(cost)
 
 init = tf.global_variables_initializer()
 

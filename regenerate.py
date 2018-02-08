@@ -13,9 +13,6 @@ input_len = tf.shape(input_data)[0]
 input_data = tf.reshape(
     tf.slice(input_data, [0, 0], [input_len - input_len % timeslice_size, 1]),
     [-1, timeslice_size])
-mean = tf.reduce_mean(input_data)
-var = tf.reduce_mean(tf.square(input_data - mean))
-input_data = (input_data - mean) / tf.sqrt(var)
 
 encoded, decoded = model(input_data)
 slices_output = decoded
@@ -27,8 +24,8 @@ saver = tf.train.Saver()
 init = tf.global_variables_initializer()
 
 with tf.Session() as session:
-    # saver.restore(session, './save/audio-autoencoder')
-    session.run(init)
+    saver.restore(session, './save/audio-autoencoder')
+    # session.run(init)
     print("Size ", session.run([
         output_file, tf.size(output_data)
     ]))

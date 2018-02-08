@@ -7,8 +7,6 @@ samples_per_second = 44100
 def model(inputs):
     conv_layer_config = [
         (5, 2),
-        (5, 2),
-        (5, 2)
     ]
 
     conv_kernels = [
