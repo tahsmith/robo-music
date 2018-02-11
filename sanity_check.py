@@ -2,15 +2,16 @@ import tensorflow as tf
 import numpy as np
 from model import Model, timeslice_size
 
-raw = tf.Variable(np.random.randn(2, timeslice_size), dtype=tf.float32)
+channels = 1
+raw = tf.Variable(np.random.randn(2, timeslice_size, channels), dtype=tf.float32)
 
-encoded, decoded = Model(raw, timeslice_size, 1)
+encoded, decoded = Model(raw, timeslice_size, channels)
 
 init = tf.global_variables_initializer()
 
 with tf.Session() as session:
     session.run(init)
-    raw_values = np.random.randn(2, timeslice_size)
+    raw_values = np.random.randn(2, timeslice_size, channels)
     print(raw_values.shape)
     encoded_values = session.run(
         encoded,
