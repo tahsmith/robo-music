@@ -4,7 +4,7 @@ from model import Model, timeslice_size
 
 raw = tf.Variable(np.random.randn(2, timeslice_size), dtype=tf.float32)
 
-encoded, decoded = Model(raw)
+encoded, decoded = Model(raw, timeslice_size, 1)
 
 init = tf.global_variables_initializer()
 

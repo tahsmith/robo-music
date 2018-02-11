@@ -6,8 +6,8 @@ from tensorflow.contrib import ffmpeg
 
 from model import Model, timeslice_size, samples_per_second
 
-x = tf.placeholder(tf.float32, shape=(None, timeslice_size))
-encoded, decoded = Model(x)
+x = tf.placeholder(tf.float32, shape=(None, timeslice_size, 1))
+encoded, decoded = Model(x, timeslice_size, 1)
 
 mse = tf.reduce_mean(tf.square(x - decoded))
 optimiser = tf.train.AdamOptimizer()
@@ -42,7 +42,7 @@ def make_batch(all_data, mask, size):
 
 with tf.Session() as session:
     waveform = session.run(waveform_op)
-    waveform = waveform.reshape(-1)
+    # waveform = waveform.reshape()
 
 n_total = waveform.shape[0]
 n_train = 80 * n_total // 100
@@ -53,10 +53,9 @@ shuffle(i_total)
 i_train = i_total[:n_train]
 i_test = i_total[n_train:]
 
-print(np.mean(waveform[i_train]), np.std(waveform[i_train]))
 
 # waveform = tf.constant(np.random.randn(n_total))
-n_epochs = 20
+n_epochs = 5
 
 saver = tf.train.Saver()
 with tf.Session() as session:

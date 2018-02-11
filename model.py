@@ -59,7 +59,7 @@ def Model(inputs, width, depth):
     output = encoded_reshaped
     for i in reversed(range(len(conv_kernels))):
         output = tf.nn.conv2d_transpose(
-            output,
+            tf.nn.relu(output) - conv_biases[i],
             conv_kernels[i],
             [batches, 1, input_shapes[i], input_depths[i]],
             strides=[1, 1, strides[i], 1],
