@@ -4,14 +4,11 @@ timeslice_size = 1224
 samples_per_second = 44100
 
 
-def Model(inputs, width, depth):
+def Model(inputs, width, depth, batches):
     conv_layer_config = [
         (1, 1, 2, tf.nn.relu),
-        (5, 1, 1, None),
+        (5, 2, 12, tf.nn.relu),
     ]
-
-    input_shape = tf.shape(inputs)
-    batches = input_shape[0]
 
     reshaped_inputs = tf.reshape(
         inputs,
@@ -41,7 +38,7 @@ def Model(inputs, width, depth):
             encode_ops[-1],
             conv_kernels[-1],
             strides=[1, 1, stride, 1],
-            padding='VALID'
+            padding='SAME'
         ) + conv_biases[-1])
         if activation:
             op = activation(op)
@@ -53,9 +50,16 @@ def Model(inputs, width, depth):
 
     flatten = tf.reshape(encode_ops[-1], (batches, -1))
     # Add fully connected layer
-    encoded = flatten
 
-    encoded_reshaped = tf.reshape(encoded, (batches, 1, -1, output_depths[-1]))
+    fc_layer_1_w = tf.Variable(tf.random_normal([int(flatten.shape[1]), 500]))
+    fc_layer_1_b = tf.Variable(tf.zeros(500))
+    fc_layer_1 = tf.matmul(flatten, fc_layer_1_w) + fc_layer_1_b
+    encoded = fc_layer_1
+
+    fc_layer_1_rev = tf.matmul(encoded - fc_layer_1_b, tf.transpose(fc_layer_1_w))
+
+    encoded_reshaped = tf.reshape(fc_layer_1_rev, (batches, 1, -1,
+                                                   output_depths[-1]))
     output = encoded_reshaped
     for i in reversed(range(len(conv_kernels))):
         output = tf.nn.conv2d_transpose(
@@ -63,7 +67,7 @@ def Model(inputs, width, depth):
             conv_kernels[i],
             [batches, 1, input_shapes[i], input_depths[i]],
             strides=[1, 1, strides[i], 1],
-            padding='VALID'
+            padding='SAME'
         )
     decoded = tf.reshape(output, (batches, -1, depth))
 

@@ -7,7 +7,7 @@ from tensorflow.contrib import ffmpeg
 from model import Model, timeslice_size, samples_per_second
 
 x = tf.placeholder(tf.float32, shape=(None, timeslice_size, 1))
-encoded, decoded = Model(x, timeslice_size, 1)
+encoded, decoded = Model(x, timeslice_size, 1, 4000)
 
 mse = tf.reduce_mean(tf.square(x - decoded))
 optimiser = tf.train.AdamOptimizer()
