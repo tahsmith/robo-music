@@ -5,14 +5,17 @@ from tensorflow.contrib import ffmpeg
 from model import Model, samples_per_second, timeslice_size
 
 n = 10 * (samples_per_second // timeslice_size)
-random_encoded = tf.constant(np.ones((n, 50)) + 0.001 * np.random.randn(n, 50), dtype=tf.float32)
-encoder, decoder = Model()
-slices_output = decoder(random_encoded)
+random_encoded = tf.constant(
+    np.ones((n, timeslice_size, 1))
+    + 0.001 * np.random.randn(n, timeslice_size, 1),
+    dtype=tf.float32)
+encoder, decoder = Model(random_encoded, timeslice_size, 1)
+slices_output = decoder
 audio_output = tf.reshape(slices_output, (-1, 1))
 
-out_format = ffmpeg.encode_audio(audio_output, file_format='mp3',
+out_format = ffmpeg.encode_audio(audio_output, file_format='wav',
                                  samples_per_second=samples_per_second)
-output_file = tf.write_file('output.mpf', out_format)
+output_file = tf.write_file('output.wav', out_format)
 saver = tf.train.Saver()
 
 with tf.Session() as session:
