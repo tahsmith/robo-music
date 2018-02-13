@@ -60,7 +60,7 @@ i_test = i_total[n_train:]
 
 
 # waveform = tf.constant(np.random.randn(n_total))
-n_epochs = 5
+n_epochs = 200
 
 saver = tf.train.Saver()
 with tf.Session() as session:

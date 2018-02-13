@@ -1,13 +1,13 @@
 import tensorflow as tf
 
-timeslice_size = 1224
-samples_per_second = 44100
+timeslice_size = 306
+samples_per_second = 11025
 
 
 def Model(inputs, width, depth, batches):
     conv_layer_config = [
-        (1, 1, 2, tf.nn.relu),
-        (5, 2, 12, tf.nn.relu),
+        # (1, 1, 2, tf.nn.relu),
+        (5, 1, 1, None),
     ]
 
     reshaped_inputs = tf.reshape(
@@ -53,8 +53,9 @@ def Model(inputs, width, depth, batches):
     flatten = tf.reshape(encode_ops[-1], (batches, -1))
     # Add fully connected layer
 
-    fc_layer_1_w = tf.Variable(tf.random_normal([int(flatten.shape[1]), 500]))
-    fc_layer_1_b = tf.Variable(tf.zeros(500))
+    fc_layer_1_w = tf.Variable(tf.random_normal([int(flatten.shape[1]),
+                                                 timeslice_size // 4]))
+    fc_layer_1_b = tf.Variable(tf.zeros(timeslice_size // 4))
     fc_layer_1 = tf.matmul(flatten, fc_layer_1_w) + fc_layer_1_b
     encoded = fc_layer_1
 
