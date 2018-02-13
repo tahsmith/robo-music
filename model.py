@@ -21,12 +21,14 @@ def Model(inputs, width, depth, batches):
     output_depths = []
     strides = []
     widths = []
+    activations = []
     encode_ops = [reshaped_inputs]
     for config in conv_layer_config:
         width, stride, output_depth, activation = config
         output_depths.append(output_depth)
         widths.append(width)
         strides.append(stride)
+        activations.append(activation)
         conv_kernels.append(
             tf.Variable(tf.random_normal((1, width, input_depths[-1],
                                           output_depth))))
@@ -34,12 +36,12 @@ def Model(inputs, width, depth, batches):
             tf.Variable(tf.zeros((output_depth,)))
         )
         input_depths.append(output_depth)
-        op = tf.nn.relu(tf.nn.conv2d(
+        op = tf.nn.conv2d(
             encode_ops[-1],
             conv_kernels[-1],
             strides=[1, 1, stride, 1],
             padding='SAME'
-        ) + conv_biases[-1])
+        ) + conv_biases[-1]
         if activation:
             op = activation(op)
         encode_ops.append(op)
@@ -62,8 +64,10 @@ def Model(inputs, width, depth, batches):
                                                    output_depths[-1]))
     output = encoded_reshaped
     for i in reversed(range(len(conv_kernels))):
+        if activations[i]:
+            output = activations[i](output)
         output = tf.nn.conv2d_transpose(
-            tf.nn.relu(output) - conv_biases[i],
+            output - conv_biases[i],
             conv_kernels[i],
             [batches, 1, input_shapes[i], input_depths[i]],
             strides=[1, 1, strides[i], 1],

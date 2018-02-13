@@ -23,6 +23,8 @@ def norm(z):
 # power_decoded = norm(tf.spectral.rfft(decoded))
 # spectral_error = tf.abs(power_x - power_decoded)
 cost = mse
+relative_error = 2 * tf.reduce_mean(tf.abs(x - decoded)) / tf.reduce_mean(
+    tf.abs(x + decoded))
 
 op = optimiser.minimize(cost)
 
@@ -43,6 +45,9 @@ def make_batch(all_data, mask, size):
 with tf.Session() as session:
     waveform = session.run(waveform_op)
     # waveform = waveform.reshape()
+waveform = (waveform - np.mean(waveform)) / np.std(waveform)
+print(np.mean(waveform))
+print(np.var(waveform))
 
 n_total = waveform.shape[0]
 n_train = 80 * n_total // 100
@@ -74,13 +79,15 @@ with tf.Session() as session:
                 train_error = session.run(mse, feed_dict={
                     x: batch
                 })
-                test_error = session.run(mse, feed_dict={
+                test_error, relative_error_value = session.run([mse,
+                                                           relative_error], feed_dict={
                     x: make_batch(waveform, i_test, batch_size)
                 })
-                print('{2:3d} / {3:3d} : {0:2.2g} {1:2.2g}'.format(
+                print('{2:3d} / {3:3d} : {0:2.2g} {1:2.2g} {4:2.2g}'.format(
                     train_error,
                     test_error,
                     i,
-                    batches
+                    batches,
+                    relative_error_value
                 ))
                 saver.save(session, './save/audio-autoencoder')
