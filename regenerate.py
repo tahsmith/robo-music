@@ -1,11 +1,14 @@
+import sys
 import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
 from model import Model, samples_per_second, timeslice_size
 
-input_file = tf.read_file(r'./data/bensound-goinghigher.mp3')
-input_data = ffmpeg.decode_audio(input_file, file_format='mp3',
+file_name = sys.argv[1]
+input_file = tf.read_file(file_name)
+input_data = ffmpeg.decode_audio(input_file,
+                                 file_format=file_name.split('.')[-1],
                                  samples_per_second=samples_per_second,
                                  channel_count=1)
 input_len = tf.shape(input_data)[0]
