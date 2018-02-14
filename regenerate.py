@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from model import Model, samples_per_second, timeslice_size
+from model import model, samples_per_second, timeslice_size
 
 file_name = sys.argv[1]
 input_file = tf.read_file(file_name)
@@ -19,7 +19,7 @@ input_data = tf.reshape(
 with tf.Session() as session:
     batches = session.run(tf.shape(input_data))[0]
 
-encoded, decoded = Model(input_data, timeslice_size, 1, batches)
+encoded, decoded = model(input_data, timeslice_size, 1, batches)
 slices_output = decoded
 output_data = tf.reshape(slices_output, (-1, 1))
 output_wav = ffmpeg.encode_audio(output_data, file_format='wav',

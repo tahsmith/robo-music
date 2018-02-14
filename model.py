@@ -4,7 +4,36 @@ timeslice_size = 306
 samples_per_second = 11025
 
 
-def Model(inputs, width, depth, batches):
+class LinearModel:
+    def __init__(self, slice_size, coding_size):
+        self.slice_size = slice_size
+        self.coding_size = coding_size
+        self.channels = 1
+        self.w = tf.Variable(tf.random_normal([slice_size, self.coding_size]))
+        self.b = tf.Variable(tf.zeros(self.coding_size))
+
+    @property
+    def variables(self):
+        return (
+            self.w,
+            self.b
+        )
+
+    def prepare(self, x):
+        return tf.reshape(x, (-1, self.slice_size))
+
+    def encoder(self, prepared_inputs):
+        return tf.matmul(prepared_inputs, self.w) + self.b
+
+    def decoder(self, codings):
+        return tf.matmul(codings - self.b, tf.transpose(self.w))
+
+    def cost(self, prepared_inputs):
+        reconstructed = self.decoder(self.encoder(prepared_inputs))
+        return tf.reduce_mean(tf.square(prepared_inputs - reconstructed))
+
+
+def model(inputs, width, depth, batches):
     conv_layer_config = [
         # (1, 1, 2, tf.nn.relu),
         (5, 1, 1, None),

@@ -1,11 +1,11 @@
 import tensorflow as tf
 import numpy as np
-from model import Model, timeslice_size
+from model import model, timeslice_size
 
 channels = 1
 raw = tf.Variable(np.random.randn(2, timeslice_size, channels), dtype=tf.float32)
 
-encoded, decoded = Model(raw, timeslice_size, channels, 2)
+encoded, decoded = model(raw, timeslice_size, channels, 2)
 
 init = tf.global_variables_initializer()
 
