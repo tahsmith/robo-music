@@ -5,6 +5,7 @@ import datetime
 import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
+from prepare import slice_size
 
 from models import LinearModel, ConvModel
 
@@ -30,7 +31,7 @@ def train(model):
 
     n_train = train.shape[0]
     n_epochs = 200
-    batch_size = 4000
+    batch_size = 2000
     batches = n_train // batch_size + 1
     x = tf.placeholder(tf.float32, [None, model.slice_size, 1])
     op, cost, misc = optimiser(model, x)
@@ -57,7 +58,7 @@ def train(model):
         except tf.errors.NotFoundError:
             session.run(init)
         for epoch in range(n_epochs):
-            print('Epoch {}'.format(epoch))
+            print(f'Epoch {epoch + 1}')
             for i in range(batches):
                 start = i * batch_size
                 end = min((i + 1) * batch_size, n_train)
@@ -67,7 +68,7 @@ def train(model):
                 session.run(op, feed_dict={
                     x: batch
                 })
-                if i % 50 == 0 or i + 1 == batches:
+                if (i + 1) % 50 == 0 or i + 1 == batches:
                     train_cost = session.run(cost, feed_dict={
                         x: batch
                     })
@@ -89,15 +90,11 @@ def train(model):
                     )
                     for string in strings:
                         file_writer.add_summary(string, step)
-                    info = '{0:>5d} / {1:<5d}: {2:>2.2g} {3:>2.2g}'.format(
-                        i + 1,
-                        batches,
-                        train_cost,
-                        test_cost
-                    )
+                    info = f'{i + 1:>5d} / {batches:<5d}' \
+                           f': {train_cost:>2.2g} {test_cost:>2.2g}'
                     print(info)
                     saver.save(session, path)
 
 
 if __name__ == '__main__':
-    train(ConvModel(1225, 175, 25, 1, "SAME"))
+    train(LinearModel(slice_size, slice_size // 2))
