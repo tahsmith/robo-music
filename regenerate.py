@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow.contrib import ffmpeg
 
 from models import LinearModel, ConvModel
+from prepare import slice_size
 
 samples_per_second = 44100
 
@@ -23,7 +24,7 @@ def regenerate(model, file_name):
         [-1, model.slice_size, 1]
     )
 
-    decoded = model.reconstructed(model.encoder(model.prepare(input_data)))
+    decoded = model.reconstructed(model.prepare(input_data))
     slices_output = decoded
     output_data = tf.reshape(slices_output, (-1, 1))
     output_wav = ffmpeg.encode_audio(output_data,
@@ -33,11 +34,11 @@ def regenerate(model, file_name):
     saver = tf.train.Saver()
 
     with tf.Session() as session:
-        saver.restore(session, './save/{}'.format(model.__class__.__name__))
+        saver.restore(session, sys.argv[2])
         session.run(
             output_file
         )
 
 
 if __name__ == '__main__':
-    regenerate(ConvModel(1225, 175, 25, 1, "SAME"), sys.argv[1])
+    regenerate(LinearModel(slice_size, slice_size // 2), sys.argv[1])
