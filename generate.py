@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from model import model, samples_per_second, timeslice_size
+from models import model, samples_per_second, timeslice_size
 
 n = 10 * (samples_per_second // timeslice_size)
 random_encoded = tf.constant(

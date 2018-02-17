@@ -1,11 +1,12 @@
 from glob import glob
 from random import shuffle
 
+import datetime
 import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from model import LinearModel
+from models import LinearModel, ConvModel
 
 
 def optimiser(model, batches):
@@ -23,37 +24,32 @@ def optimiser(model, batches):
     }
 
 
-def make_batch(all_data, mask, size, timeslice_size):
-    indices = np.random.choice(mask, size=(size, 1))
-    indices = indices + np.arange(0, timeslice_size)
-    return all_data[indices.astype(np.int32)]
-
-
 def train(model):
-    files = glob('./data/*.raw')
-    all_data = np.zeros((0, 1), np.float32)
-    for file in files:
-        waveform = np.fromfile(files[0], dtype='<i2')
-        waveform = np.reshape(waveform, (-1, 1))
-        waveform = (waveform - np.mean(waveform)) / np.std(waveform)
-        all_data = np.concatenate((all_data, waveform), axis=0)
+    test = np.load('./data/test.npy')
+    train = np.load('./data/train.npy')
 
-    n_total = all_data.shape[0]
-    n_train = 80 * n_total // 100
-    batch_size = 4000
-    batches = n_train // batch_size
-    i_total = np.arange(0, n_total - model.slice_size, dtype=np.int32)
-    shuffle(i_total)
-    i_train = i_total[:n_train]
-    i_test = i_total[n_train:]
-
+    n_train = train.shape[0]
     n_epochs = 200
-    x = tf.placeholder(tf.float32, [None, model.slice_size, model.channels])
+    batch_size = 4000
+    batches = n_train // batch_size + 1
+    x = tf.placeholder(tf.float32, [None, model.slice_size, 1])
     op, cost, misc = optimiser(model, x)
 
-    path = './save/{}'.format(model.__class__.__name__)
+    tag = f'{model.__class__.__name__}' \
+          f'-{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
+
+    path = './save/' + tag
     saver = tf.train.Saver()
     init = tf.global_variables_initializer()
+    test_cost_summary = tf.summary.scalar('test cost', cost)
+    train_cost_summary = tf.summary.scalar('train cost', cost)
+    misc_summaries = [tf.summary.scalar(label, var) for label, var in
+                      misc.items()]
+
+    file_writer = tf.summary.FileWriter(
+        './logs/' + tag,
+        tf.get_default_graph()
+    )
 
     with tf.Session() as session:
         try:
@@ -63,31 +59,45 @@ def train(model):
         for epoch in range(n_epochs):
             print('Epoch {}'.format(epoch))
             for i in range(batches):
-                batch = make_batch(all_data, i_train, batch_size,
-                                   model.slice_size)
+                start = i * batch_size
+                end = min((i + 1) * batch_size, n_train)
+                if start == end:
+                    return
+                batch = train[start:end, :]
                 session.run(op, feed_dict={
                     x: batch
                 })
-                if i % 50 == 0:
-                    train_error = session.run(cost, feed_dict={
+                if i % 50 == 0 or i + 1 == batches:
+                    train_cost = session.run(cost, feed_dict={
                         x: batch
                     })
-                    test_error, relative_error_value = session.run(
-                        [cost, misc['relative error']],
-                        feed_dict={
-                            x: make_batch(all_data, i_test, batch_size,
-                                          model.slice_size)
+                    step = epoch * batches + i
+                    string = session.run(train_cost_summary, feed_dict={
+                        x: batch,
+                        cost: train_cost
+                    })
+                    file_writer.add_summary(string, step)
+                    test_cost = session.run(cost, feed_dict={
+                            x: test
                         })
-                    info = '{2:3d} / {3:3d} :' \
-                           ' {0:2.2g} {1:2.2g} {4:2.2g}'.format(
-                        train_error,
-                        test_error, i,
+                    strings = session.run(
+                        [test_cost_summary] + misc_summaries,
+                        feed_dict={
+                            x: test,
+                            cost: test_cost
+                        }
+                    )
+                    for string in strings:
+                        file_writer.add_summary(string, step)
+                    info = '{0:>5d} / {1:<5d}: {2:>2.2g} {3:>2.2g}'.format(
+                        i + 1,
                         batches,
-                        relative_error_value
+                        train_cost,
+                        test_cost
                     )
                     print(info)
                     saver.save(session, path)
 
 
 if __name__ == '__main__':
-    train(LinearModel(1225, 1225 // 4))
+    train(ConvModel(1225, 175, 25, 1, "SAME"))

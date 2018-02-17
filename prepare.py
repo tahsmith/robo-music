@@ -1,22 +1,87 @@
-import sys
-import soundfile as sf
-import audioop
+import glob
+
+import math
+import numpy as np
 import pickle
+from utils import conv_size
+
+slice_size = 1225
+channels = 1
+
+
+def save_array(x, filename):
+    np.save(filename, x, allow_pickle=False)
+
+
+def make_batch(all_data, start, size, timeslice_size):
+    indices = np.arange(start, size).reshape((size, 1))
+    indices = indices + np.arange(0, timeslice_size)
+    return all_data[indices.astype(np.int32)]
+
+
+def make_slice_set(chunks, stride):
+    chunk_size = chunks.shape[1]
+    chunk_count = chunks.shape[0]
+    slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
+    slices = chunk_count * slice_per_chunk
+
+    slices = np.zeros((slices, slice_size, channels))
+    for i_chunk in range(chunk_count):
+        for i_slice in range(slice_per_chunk):
+            begin = i_slice * stride
+            end = begin + slice_size
+            slices[i_chunk * slice_per_chunk + i_slice, :, :] = \
+                chunks[i_chunk, begin:end, :]
+
+    np.random.shuffle(slices)
+    return slices
 
 
 def main():
-    file_name = sys.argv[1]
-    samples_per_second = int(sys.argv[2])
-    channels = int(sys.argv[3])
-    raw_data, actual_sample_rate = sf.read(file_name, always_2d=True)
-    raw_data = raw_data.T
-    print(raw_data.shape, file=sys.stderr)
-    raw_data, _ = audioop.ratecv(raw_data, 2, raw_data.shape[1],
-                                 actual_sample_rate, samples_per_second,
-                                 None)
-    out_file_name = sys.argv[4]
-    with open(out_file_name, 'wb') as file:
-        pickle.dump(raw_data, file)
+    files = glob.glob('./data/*.raw')
+    all_data = np.zeros((0, 1), np.float32)
+    for file in files:
+        waveform = np.fromfile(file, dtype='<i2')
+        waveform = np.array(waveform, dtype=np.float32)
+        waveform = np.reshape(waveform, (-1, channels))
+        waveform = (waveform - np.mean(waveform)) / np.std(waveform)
+        all_data = np.concatenate((all_data, waveform), axis=0)
+
+    # all_data = all_data[:125650, :]
+    # Cut down to percent chunks
+    n_samples = all_data.shape[0]
+    chunk_size = n_samples // 100
+    all_data = all_data[:n_samples - n_samples % 100, :]
+    percent_chunks = all_data.reshape((-1, chunk_size, channels))
+    train_percent = 90
+    stride = slice_size // 4
+    slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
+
+    print('Total samples ', n_samples)
+    print('Chunk size    ', chunk_size)
+    print('Chunked size  ', chunk_size * 100)
+    print('Chunking loss ', (n_samples - 100 * chunk_size) * 100 / n_samples,
+          '%')
+    train_count = train_percent * slice_per_chunk
+    print('Train count   ', train_count)
+    print('Train size    ',
+          train_count * channels * slice_size * 4 / 2 ** 10 / 1e3, 'MB')
+
+    test_count = (100 - train_percent) * slice_per_chunk
+    print('Test count    ', test_count)
+    print('Test size     ',
+          test_count * channels * slice_size * 4 / 2 ** 10 / 1e3, 'MB')
+
+    np.random.shuffle(percent_chunks)
+    train_chunks = percent_chunks[:train_percent, :, :]
+    test_chuncks = percent_chunks[train_percent:, :, :]
+
+    train = make_slice_set(train_chunks, stride)
+    print(train.shape)
+    save_array(train, './data/train.npy')
+    test = make_slice_set(test_chuncks, stride)
+    print(test.shape)
+    save_array(test, './data/test.npy')
 
 
 if __name__ == '__main__':
