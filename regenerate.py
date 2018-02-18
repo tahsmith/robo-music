@@ -41,4 +41,4 @@ def regenerate(model, file_name):
 
 
 if __name__ == '__main__':
-    regenerate(LinearModel(slice_size, slice_size // 2), sys.argv[1])
+    regenerate(ConvModel(slice_size, 15, 7, 1, "SAME"), sys.argv[1])

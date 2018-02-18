@@ -3,19 +3,39 @@ import tensorflow as tf
 from utils import conv_size
 timeslice_size = 306
 samples_per_second = 11025
+import numpy as np
 
 
 class Model:
     def reconstructed(self, batches):
         return self.decoder(self.encoder(batches))
 
+    def training_feeds(self):
+        return {}
+
+    def testing_feeds(self):
+        return {}
+
 
 class LinearModel(Model):
     def __init__(self, slice_size, coding_size):
         self.slice_size = slice_size
         self.coding_size = coding_size
-        self.w = tf.Variable(tf.random_normal([slice_size, self.coding_size]))
+        self.w = tf.Variable(tf.random_normal(
+            [slice_size, self.coding_size]
+        ) * np.sqrt(2.0 / (coding_size + slice_size)))
         self.b = tf.Variable(tf.zeros(self.coding_size))
+        self.keep_prob = tf.placeholder(tf.float32)
+
+    def training_feeds(self):
+        return {
+            self.keep_prob: 0.8
+        }
+
+    def testing_feeds(self):
+        return {
+            self.keep_prob: 1.0
+        }
 
     @property
     def variables(self):
@@ -48,7 +68,8 @@ class ConvModel(Model):
         self.slice_size = input_width
         self.width = filter_width
         self.w = tf.Variable(
-            tf.random_normal((1, filter_width, 1, filter_out_channels)),
+            tf.random_normal((1, filter_width, 1, filter_out_channels)) *
+            np.sqrt(2.0 / (input_width + filter_width)),
             name='w'
         )
         self.b = tf.Variable(

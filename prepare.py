@@ -1,10 +1,13 @@
 import glob
 
 import math
+from itertools import product
+
 import numpy as np
 import pickle
 from utils import conv_size
 
+batch_size = 2
 slice_size = 1225
 channels = 1
 
@@ -19,19 +22,20 @@ def make_batch(all_data, start, size, timeslice_size):
     return all_data[indices.astype(np.int32)]
 
 
-def make_slice_set(chunks, stride):
+def generate_slice_set(chunks, stride):
     chunk_size = chunks.shape[1]
     chunk_count = chunks.shape[0]
     slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
     slices = chunk_count * slice_per_chunk
 
-    slices = np.zeros((slices, slice_size, channels))
-    for i_chunk in range(chunk_count):
-        for i_slice in range(slice_per_chunk):
-            begin = i_slice * stride
-            end = begin + slice_size
-            slices[i_chunk * slice_per_chunk + i_slice, :, :] = \
-                chunks[i_chunk, begin:end, :]
+    chunk_indices = list(range(chunk_count))
+    slice_indices = list(range(slice_per_chunk))
+    indices = product(chunk_indices, slice_indices)
+
+    for i_chunk, i_slice in indices:
+        begin = i_slice * stride
+        end = begin + slice_size
+        yield chunks[i_chunk, begin:end, :]
 
     np.random.shuffle(slices)
     return slices
@@ -54,7 +58,7 @@ def main():
     all_data = all_data[:n_samples - n_samples % 100, :]
     percent_chunks = all_data.reshape((-1, chunk_size, channels))
     train_percent = 90
-    stride = slice_size // 4
+    stride = slice_size // 8
     slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
 
     print('Total samples ', n_samples)

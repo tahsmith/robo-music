@@ -17,7 +17,7 @@ def optimiser(model, batches):
     codings = model.encoder(batches)
     reconstructed = model.decoder(codings)
     abs_error = tf.reduce_mean(tf.abs(batches - reconstructed))
-    avg = tf.reduce_mean(tf.abs(batches + reconstructed)) / 2
+    avg = tf.reduce_mean(tf.abs(batches))
     relative_error = abs_error / avg
     op = optimiser.minimize(cost)
     return op, cost, {
@@ -31,7 +31,7 @@ def train(model):
 
     n_train = train.shape[0]
     n_epochs = 200
-    batch_size = 2000
+    batch_size = 500
     batches = n_train // batch_size + 1
     x = tf.placeholder(tf.float32, [None, model.slice_size, 1])
     op, cost, misc = optimiser(model, x)
@@ -52,13 +52,14 @@ def train(model):
         tf.get_default_graph()
     )
 
+    log_period = batches * batch_size // 10
     with tf.Session() as session:
-        try:
-            saver.restore(session, path)
-        except tf.errors.NotFoundError:
-            session.run(init)
+        session.run(init)
         for epoch in range(n_epochs):
             print(f'Epoch {epoch + 1}')
+
+            log_counter = 0
+            np.random.shuffle(train)
             for i in range(batches):
                 start = i * batch_size
                 end = min((i + 1) * batch_size, n_train)
@@ -66,26 +67,34 @@ def train(model):
                     return
                 batch = train[start:end, :]
                 session.run(op, feed_dict={
-                    x: batch
+                    x: batch,
+                    **model.training_feeds()
                 })
-                if (i + 1) % 50 == 0 or i + 1 == batches:
+
+                log_counter += batch_size
+                if log_counter > log_period:
+                    log_counter = 0
                     train_cost = session.run(cost, feed_dict={
-                        x: batch
+                        x: batch,
+                        **model.testing_feeds()
                     })
                     step = epoch * batches + i
                     string = session.run(train_cost_summary, feed_dict={
                         x: batch,
-                        cost: train_cost
+                        cost: train_cost,
+                        **model.testing_feeds()
                     })
                     file_writer.add_summary(string, step)
                     test_cost = session.run(cost, feed_dict={
-                            x: test
+                            x: test,
+                        **model.testing_feeds()
                         })
                     strings = session.run(
                         [test_cost_summary] + misc_summaries,
                         feed_dict={
                             x: test,
-                            cost: test_cost
+                            cost: test_cost,
+                            **model.testing_feeds()
                         }
                     )
                     for string in strings:
@@ -97,4 +106,4 @@ def train(model):
 
 
 if __name__ == '__main__':
-    train(LinearModel(slice_size, slice_size // 2))
+    train(ConvModel(slice_size, 15, 7, 1, "SAME"))
