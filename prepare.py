@@ -1,5 +1,6 @@
 import glob
 from itertools import product
+import subprocess
 
 import numpy as np
 from utils import conv_size
@@ -43,6 +44,7 @@ def batch(slices):
 
 def main():
     files = glob.glob('./data/*.raw')
+    np.random.shuffle(files)
     all_data = np.zeros((0, 1), np.float32)
     for file in files:
         waveform = np.fromfile(file, dtype='<i2')
@@ -58,7 +60,7 @@ def main():
     all_data = all_data[:n_samples - n_samples % 100, :]
     percent_chunks = all_data.reshape((-1, chunk_size, channels))
     train_percent = 90
-    stride = slice_size // 8
+    stride = slice_size // 4
     slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
 
     print('Total samples ', n_samples)

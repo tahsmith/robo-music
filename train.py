@@ -18,13 +18,11 @@ def optimiser(model, batches):
     }
 
 
-def train(model):
+def train(batch_size, n_epochs, model):
     test = np.load('./data/test.npy')
     train = np.load('./data/train.npy')
 
     n_train = train.shape[0]
-    n_epochs = 200
-    batch_size = 4000
     batches = n_train // batch_size + 1
     x = tf.placeholder(tf.float32, [None, model.slice_size, 1])
     op, cost, misc = optimiser(model, x)
@@ -100,4 +98,4 @@ def train(model):
 
 if __name__ == '__main__':
     import config
-    train(config.model)
+    train(config.batch_size, config.n_epochs, config.model)

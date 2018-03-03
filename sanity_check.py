@@ -17,14 +17,16 @@ with tf.Session() as session:
     encoded_values = session.run(
         encoded,
         feed_dict={
-            raw: raw_values
+            raw: raw_values,
+            **model.testing_feeds()
         }
     )
     print(encoded_values.shape)
     decoded_values = session.run(
         decoded,
         feed_dict={
-            encoded: np.random.randn(*encoded_values.shape)
+            encoded: np.random.randn(*encoded_values.shape),
+            **model.testing_feeds()
         }
     )
     print(decoded_values.shape)

@@ -2,8 +2,7 @@ import math
 import tensorflow as tf
 from utils import conv_size
 
-timeslice_size = 306
-samples_per_second = 11025
+from config import slice_size, channels
 import numpy as np
 
 
@@ -26,17 +25,6 @@ class LinearModel(Model):
             [slice_size, self.coding_size]
         ) * np.sqrt(2.0 / (coding_size + slice_size)))
         self.b = tf.Variable(tf.zeros(self.coding_size))
-        self.keep_prob = tf.placeholder(tf.float32)
-
-    def training_feeds(self):
-        return {
-            self.keep_prob: 0.8
-        }
-
-    def testing_feeds(self):
-        return {
-            self.keep_prob: 1.0
-        }
 
     @property
     def variables(self):
@@ -49,8 +37,7 @@ class LinearModel(Model):
         return tf.reshape(x, (-1, self.slice_size))
 
     def encoder(self, prepared_inputs):
-        return tf.nn.dropout(tf.matmul(prepared_inputs, self.w) + self.b,
-                          self.keep_prob)
+        return tf.matmul(prepared_inputs, self.w) + self.b
 
     def decoder(self, codings):
         return tf.matmul(codings - self.b, tf.transpose(self.w))
@@ -119,7 +106,7 @@ class ConvModel(Model):
 
 class DeepConvModel(Model):
     def __init__(self, slice_size, widths, strides, channels,
-                 paddings, activations):
+                 paddings, activations, fc_stack):
         self.n_layers = len(widths)
         self.slice_size = slice_size
         self.widths = [slice_size] + widths
@@ -152,9 +139,7 @@ class DeepConvModel(Model):
             ) for i in range(1, n_layers + 1)
         ]
 
-        self.fc_layer = LinearModel(self.output_widths[-1]
-                                    * self.output_depths[-1],
-                                    50)
+        self.fc_stack = fc_stack
 
         self.keep_prob = tf.placeholder(tf.float32)
 
@@ -199,7 +184,11 @@ class DeepConvModel(Model):
             [-1, self.output_widths[-1] *
              self.output_depths[-1]]
         )
-        return self.fc_layer.encoder(output)
+
+        if self.fc_stack is not None:
+            output = self.fc_stack.encoder(output)
+
+        return output
 
         # return tf.nn.conv2d(
         #     prepared_inputs,
@@ -209,7 +198,10 @@ class DeepConvModel(Model):
         # ) + self.b
 
     def decoder(self, codings):
-        output = self.fc_layer.decoder(codings)
+        output = codings
+        if self.fc_stack is not None:
+            output = self.fc_stack.decoder(output)
+
         output = tf.reshape(
             output,
             [-1, 1, self.output_widths[-1], self.output_depths[-1]]
@@ -228,6 +220,7 @@ class DeepConvModel(Model):
             if self.activations[i] is not None:
                 output = self.activations[i](output)
 
+        output = tf.reshape(output, [n_batches, slice_size, channels])
         return output
 
         # return tf.nn.conv2d_transpose(
@@ -293,8 +286,8 @@ def model(inputs, width, depth, batches):
     # Add fully connected layer
 
     fc_layer_1_w = tf.Variable(tf.random_normal([int(flatten.shape[1]),
-                                                 timeslice_size // 4]))
-    fc_layer_1_b = tf.Variable(tf.zeros(timeslice_size // 4))
+                                                 slice_size // 4]))
+    fc_layer_1_b = tf.Variable(tf.zeros(slice_size // 4))
     fc_layer_1 = tf.matmul(flatten, fc_layer_1_w) + fc_layer_1_b
     encoded = fc_layer_1
 
