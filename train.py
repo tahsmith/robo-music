@@ -1,13 +1,6 @@
-from glob import glob
-from random import shuffle
-
 import datetime
 import tensorflow as tf
 import numpy as np
-from tensorflow.contrib import ffmpeg
-from prepare import slice_size
-
-from models import LinearModel, ConvModel
 
 
 def optimiser(model, batches):
@@ -31,7 +24,7 @@ def train(model):
 
     n_train = train.shape[0]
     n_epochs = 200
-    batch_size = 500
+    batch_size = 4000
     batches = n_train // batch_size + 1
     x = tf.placeholder(tf.float32, [None, model.slice_size, 1])
     op, cost, misc = optimiser(model, x)
@@ -86,9 +79,9 @@ def train(model):
                     })
                     file_writer.add_summary(string, step)
                     test_cost = session.run(cost, feed_dict={
-                            x: test,
+                        x: test,
                         **model.testing_feeds()
-                        })
+                    })
                     strings = session.run(
                         [test_cost_summary] + misc_summaries,
                         feed_dict={
@@ -106,4 +99,5 @@ def train(model):
 
 
 if __name__ == '__main__':
-    train(ConvModel(slice_size, 15, 7, 1, "SAME"))
+    import config
+    train(config.model)

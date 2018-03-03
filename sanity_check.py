@@ -1,13 +1,11 @@
 import tensorflow as tf
 import numpy as np
-import models
 import prepare
+from config import model, channels, slice_size
 
-channels = 1
-raw = tf.Variable(np.random.randn(2, prepare.slice_size, channels),
+raw = tf.Variable(np.random.randn(2, slice_size, channels),
                   dtype=tf.float32)
 
-model = models.ConvModel(prepare.slice_size, 15, 7, 2, "SAME")
 encoded = model.encoder(model.prepare(raw))
 decoded = model.decoder(encoded)
 init = tf.global_variables_initializer()
@@ -30,4 +28,4 @@ with tf.Session() as session:
         }
     )
     print(decoded_values.shape)
-    assert(raw_values.shape == decoded_values.shape)
+    assert (raw_values.shape == decoded_values.shape)

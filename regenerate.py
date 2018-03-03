@@ -2,8 +2,8 @@ import sys
 import tensorflow as tf
 from tensorflow.contrib import ffmpeg
 
-from models import LinearModel, ConvModel
-from prepare import slice_size
+import models
+import prepare
 
 samples_per_second = 44100
 
@@ -41,4 +41,5 @@ def regenerate(model, file_name):
 
 
 if __name__ == '__main__':
-    regenerate(ConvModel(slice_size, 15, 7, 1, "SAME"), sys.argv[1])
+    import config
+    regenerate(config.model, sys.argv[1])

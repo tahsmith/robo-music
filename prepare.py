@@ -1,15 +1,9 @@
 import glob
-
-import math
 from itertools import product
 
 import numpy as np
-import pickle
 from utils import conv_size
-
-batch_size = 2
-slice_size = 1225
-channels = 1
+from config import slice_size, channels, batch_size
 
 
 def save_array(x, filename):
@@ -26,7 +20,6 @@ def generate_slice_set(chunks, stride):
     chunk_size = chunks.shape[1]
     chunk_count = chunks.shape[0]
     slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
-    slices = chunk_count * slice_per_chunk
 
     chunk_indices = list(range(chunk_count))
     slice_indices = list(range(slice_per_chunk))
@@ -35,10 +28,17 @@ def generate_slice_set(chunks, stride):
     for i_chunk, i_slice in indices:
         begin = i_slice * stride
         end = begin + slice_size
-        yield chunks[i_chunk, begin:end, :]
+        if end <= chunk_size:
+            yield chunks[i_chunk, begin:end, :]
 
-    np.random.shuffle(slices)
-    return slices
+
+def batch(slices):
+    slices = list(slices)
+    batch = np.empty((len(slices), slice_size, channels))
+    for i, slice in enumerate(slices):
+        batch[i, :, :] = slice
+
+    return batch
 
 
 def main():
@@ -80,10 +80,10 @@ def main():
     train_chunks = percent_chunks[:train_percent, :, :]
     test_chuncks = percent_chunks[train_percent:, :, :]
 
-    train = make_slice_set(train_chunks, stride)
+    train = batch(generate_slice_set(train_chunks, stride), )
     print(train.shape)
     save_array(train, './data/train.npy')
-    test = make_slice_set(test_chuncks, stride)
+    test = batch(generate_slice_set(test_chuncks, stride))
     print(test.shape)
     save_array(test, './data/test.npy')
 
