@@ -2,9 +2,6 @@ import sys
 import tensorflow as tf
 from tensorflow.contrib import ffmpeg
 
-import models
-import prepare
-
 samples_per_second = 44100
 
 
@@ -36,7 +33,10 @@ def regenerate(model, file_name):
     with tf.Session() as session:
         saver.restore(session, sys.argv[2])
         session.run(
-            output_file
+            output_file,
+            feed_dict={
+                **model.testing_feeds()
+            }
         )
 
 
