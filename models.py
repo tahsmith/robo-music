@@ -87,8 +87,20 @@ class FcStack(Model):
             self.b_list
         )
 
+    @property
+    def n_features(self):
+        return 1226
+
+    def preprocess(self, x):
+        assert (channels == 1)
+        x = tf.reshape(x, (-1, slice_size))
+        rfft = tf.spectral.rfft(x)
+        re = tf.real(rfft)
+        im = tf.imag(rfft)
+        return tf.concat((re, im), axis=1)
+
     def prepare(self, x):
-        return tf.reshape(x, (-1, self.input_size))
+        return tf.reshape(x, (-1, self.n_features))
 
     def encoder(self, prepared_inputs):
         codings = prepared_inputs

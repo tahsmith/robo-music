@@ -10,6 +10,6 @@ import models
 
 
 model = models.FcStack(
-    slice_size, 50,
-    depth=4
+    1226, 4,
+    depth=8
 )

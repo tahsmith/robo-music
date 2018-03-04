@@ -8,8 +8,13 @@ def optimiser(model, x_batch, y_batch):
     batches = model.prepare(x_batch)
     optimiser = tf.train.AdamOptimizer()
     cost = model.cost(batches, y_batch)
+    y_pred = model.encoder(batches)
+    y_pred = tf.argmax(tf.nn.softmax(y_pred), axis=1)
+    _, accuracy_op = tf.metrics.accuracy(y_batch, y_pred)
     op = optimiser.minimize(cost)
-    return op, cost
+    return op, cost, {
+        'accuracy': accuracy_op
+    }
 
 
 def train(batch_size, n_epochs, model):
@@ -23,22 +28,29 @@ def train(batch_size, n_epochs, model):
     print(f'Training samples: {n_train}')
     print(f'Test samples: {n_test}')
     batches = n_train // batch_size + 1
-    x = tf.placeholder(tf.float32, [None, model.slice_size, 1])
+    x = tf.placeholder(tf.float32, [None, model.n_features])
     y = tf.placeholder(tf.int32, [None])
-    op, cost = optimiser(model, x, y)
+    op, cost, misc = optimiser(model, x, y)
+    misc_summaries = [tf.summary.scalar(label, var) for label, var in
+                      misc.items()]
 
     tag = f'{model.__class__.__name__}' \
           f'-{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
 
     path = './save/' + tag
     saver = tf.train.Saver()
-    init = tf.global_variables_initializer()
+
     test_cost_summary = tf.summary.scalar('test cost', cost)
     train_cost_summary = tf.summary.scalar('train cost', cost)
 
     file_writer = tf.summary.FileWriter(
         './logs/' + tag,
         tf.get_default_graph()
+    )
+
+    init = tf.group(
+        tf.global_variables_initializer(),
+        tf.local_variables_initializer()
     )
 
     log_period = batches * batch_size // 10
@@ -84,7 +96,7 @@ def train(batch_size, n_epochs, model):
                         **model.testing_feeds()
                     })
                     strings = session.run(
-                        [test_cost_summary],
+                        [test_cost_summary] + misc_summaries,
                         feed_dict={
                             x: x_test,
                             y: y_test,

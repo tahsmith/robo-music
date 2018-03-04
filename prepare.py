@@ -4,9 +4,10 @@ from itertools import product
 
 import numpy as np
 from os import walk
+import tensorflow as tf
 
 from utils import conv_size
-from config import slice_size, channels, batch_size
+from config import slice_size, channels, batch_size, model
 
 samples_per_second = 44100
 
@@ -77,37 +78,49 @@ def concat_raw_from_files(file_list):
 
 def create_samples(waveform, cat):
     waveform = waveform[:waveform.shape[0] - waveform.shape[0] % slice_size, :]
-    waveform = waveform.reshape((-1, slice_size, channels))
-    return waveform, np.ones((waveform.shape[0],), dtype=np.uint8) * cat
+    stride = slice_size // 4
+    n_samples = (waveform.shape[0] - slice_size) // stride + 1
+    samples = np.empty((n_samples, slice_size, channels))
+    for i in range(n_samples):
+        begin = i * stride
+        end = begin + slice_size
+        assert (end <= waveform.shape[0])
+        samples[i, :, :] = waveform[begin:end]
+    return samples, np.ones((samples.shape[0],), dtype=np.uint8) * cat
 
 
 def main():
     i = 0
-    all_x = np.empty((0, slice_size, channels), dtype=np.float32)
+    all_x = np.empty((0, model.n_features), dtype=np.float32)
     all_y = np.empty((0,), dtype=np.uint8)
-    for k, v in list_input_files().items():
-        all_data_for_cat = concat_raw_from_files(v)
-        seconds = all_data_for_cat.shape[0] / samples_per_second
 
-        x, y = create_samples(all_data_for_cat, i)
-        assert(x.shape[0] == y.shape[0])
-        print(f'{i} {k}: {seconds:0.2f}s {x.shape[0]} samples')
-        all_x = np.concatenate((all_x, x), axis=0)
-        all_y = np.concatenate((all_y, y), axis=0)
-        i += 1
+    x = tf.placeholder(tf.float32, (None, slice_size, channels))
+    features_op = model.preprocess(x)
+    with tf.Session() as session:
+        for k, v in list_input_files().items():
+            all_data_for_cat = concat_raw_from_files(v)
+            seconds = all_data_for_cat.shape[0] / samples_per_second
+
+            samples, y = create_samples(all_data_for_cat, i)
+            features = session.run(features_op, {x: samples})
+            assert (features.shape[0] == y.shape[0])
+            all_x = np.concatenate((all_x, features), axis=0)
+            all_y = np.concatenate((all_y, y), axis=0)
+            print(f'{i} {k}: {seconds:0.2f}s {features.shape[0]} samples')
+            i += 1
 
     n_samples = all_x.shape[0]
     indices = np.arange(0, n_samples)
     np.random.shuffle(indices)
-    all_x = all_x[indices, :, :]
+    all_x = all_x[indices]
     all_y = all_y[indices]
 
     train_percent = 90
     i_train = (n_samples * train_percent) // 100
-    x_train = all_x[0:i_train, :, :]
+    x_train = all_x[0:i_train]
     y_train = all_y[0:i_train]
 
-    x_test = all_x[i_train:, :, :]
+    x_test = all_x[i_train:]
     y_test = all_y[i_train:]
 
     save_array(x_test, './data/x_test.npy')
