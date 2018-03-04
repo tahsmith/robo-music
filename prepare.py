@@ -51,7 +51,8 @@ def list_categories():
     category_names = []
     for root, dirs, files in walk('./data'):
         for dir in dirs:
-            category_names.append(dir)
+            if dir[0] != '_':
+                category_names.append(dir)
         if root != './data':
             break
 
@@ -78,7 +79,7 @@ def concat_raw_from_files(file_list):
 
 def create_samples(waveform, cat):
     waveform = waveform[:waveform.shape[0] - waveform.shape[0] % slice_size, :]
-    stride = slice_size // 4
+    stride = slice_size // 32
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
     samples = np.empty((n_samples, slice_size, channels))
     for i in range(n_samples):
@@ -94,19 +95,34 @@ def main():
     all_x = np.empty((0, model.n_features), dtype=np.float32)
     all_y = np.empty((0,), dtype=np.uint8)
 
+    input_files = list_input_files()
+    for k, v in input_files.items():
+        print(f'{k}: {len(v)}')
+
     x = tf.placeholder(tf.float32, (None, slice_size, channels))
     features_op = model.preprocess(x)
     with tf.Session() as session:
-        for k, v in list_input_files().items():
+        for k, v in input_files.items():
             all_data_for_cat = concat_raw_from_files(v)
             seconds = all_data_for_cat.shape[0] / samples_per_second
 
-            samples, y = create_samples(all_data_for_cat, i)
-            features = session.run(features_op, {x: samples})
-            assert (features.shape[0] == y.shape[0])
-            all_x = np.concatenate((all_x, features), axis=0)
-            all_y = np.concatenate((all_y, y), axis=0)
-            print(f'{i} {k}: {seconds:0.2f}s {features.shape[0]} samples')
+            cat_x = np.empty((0, model.n_features), dtype=np.float32)
+            cat_y = np.empty((0,), dtype=np.uint8)
+            preprocessing_batch_size = 400000
+            for j in range(i, all_data_for_cat.shape[0],
+                           preprocessing_batch_size):
+                begin = j
+                end = min(j + preprocessing_batch_size,
+                          all_data_for_cat.shape[0])
+                samples, y = create_samples(all_data_for_cat[begin:end], i)
+                features = session.run(features_op, {x: samples})
+                assert (features.shape[0] == y.shape[0])
+                cat_x = np.concatenate((cat_x, features), axis=0)
+                cat_y = np.concatenate((cat_y, y), axis=0)
+
+            all_x = np.concatenate((all_x, cat_x), axis=0)
+            all_y = np.concatenate((all_y, cat_y), axis=0)
+            print(f'{i} {k}: {seconds:0.2f}s {cat_x.shape[0]} samples')
             i += 1
 
     n_samples = all_x.shape[0]

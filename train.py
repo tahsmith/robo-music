@@ -8,7 +8,7 @@ def optimiser(model, x_batch, y_batch):
     batches = model.prepare(x_batch)
     optimiser = tf.train.AdamOptimizer()
     cost = model.cost(batches, y_batch)
-    y_pred = model.encoder(batches)
+    y_pred = model.predict(batches)
     y_pred = tf.argmax(tf.nn.softmax(y_pred), axis=1)
     _, accuracy_op = tf.metrics.accuracy(y_batch, y_pred)
     op = optimiser.minimize(cost)
