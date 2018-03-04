@@ -1,10 +1,14 @@
 import glob
+import os
 from itertools import product
-import subprocess
 
 import numpy as np
+from os import walk
+
 from utils import conv_size
 from config import slice_size, channels, batch_size
+
+samples_per_second = 44100
 
 
 def save_array(x, filename):
@@ -42,52 +46,74 @@ def batch(slices):
     return batch
 
 
-def main():
-    files = glob.glob('./data/*.raw')
-    np.random.shuffle(files)
+def list_categories():
+    category_names = []
+    for root, dirs, files in walk('./data'):
+        for dir in dirs:
+            category_names.append(dir)
+        if root != './data':
+            break
+
+    return category_names
+
+
+def list_input_files():
+    return {
+        k: glob.glob(os.path.join('./data', k, '*.raw'))
+        for k in list_categories()
+    }
+
+
+def concat_raw_from_files(file_list):
     all_data = np.zeros((0, 1), np.float32)
-    for file in files:
+    for file in file_list:
         waveform = np.fromfile(file, dtype='<i2')
         waveform = np.array(waveform, dtype=np.float32)
         waveform = np.reshape(waveform, (-1, channels))
         waveform = (waveform - np.mean(waveform)) / np.std(waveform)
         all_data = np.concatenate((all_data, waveform), axis=0)
+    return all_data
 
-    # all_data = all_data[:125650, :]
-    # Cut down to percent chunks
-    n_samples = all_data.shape[0]
-    chunk_size = n_samples // 100
-    all_data = all_data[:n_samples - n_samples % 100, :]
-    percent_chunks = all_data.reshape((-1, chunk_size, channels))
+
+def create_samples(waveform, cat):
+    waveform = waveform[:waveform.shape[0] - waveform.shape[0] % slice_size, :]
+    waveform = waveform.reshape((-1, slice_size, channels))
+    return waveform, np.ones((waveform.shape[0],), dtype=np.uint8) * cat
+
+
+def main():
+    i = 0
+    all_x = np.empty((0, slice_size, channels), dtype=np.float32)
+    all_y = np.empty((0,), dtype=np.uint8)
+    for k, v in list_input_files().items():
+        all_data_for_cat = concat_raw_from_files(v)
+        seconds = all_data_for_cat.shape[0] / samples_per_second
+
+        x, y = create_samples(all_data_for_cat, i)
+        assert(x.shape[0] == y.shape[0])
+        print(f'{i} {k}: {seconds:0.2f}s {x.shape[0]} samples')
+        all_x = np.concatenate((all_x, x), axis=0)
+        all_y = np.concatenate((all_y, y), axis=0)
+        i += 1
+
+    n_samples = all_x.shape[0]
+    indices = np.arange(0, n_samples)
+    np.random.shuffle(indices)
+    all_x = all_x[indices, :, :]
+    all_y = all_y[indices]
+
     train_percent = 90
-    stride = slice_size // 4
-    slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
+    i_train = (n_samples * train_percent) // 100
+    x_train = all_x[0:i_train, :, :]
+    y_train = all_y[0:i_train]
 
-    print('Total samples ', n_samples)
-    print('Chunk size    ', chunk_size)
-    print('Chunked size  ', chunk_size * 100)
-    print('Chunking loss ', (n_samples - 100 * chunk_size) * 100 / n_samples,
-          '%')
-    train_count = train_percent * slice_per_chunk
-    print('Train count   ', train_count)
-    print('Train size    ',
-          train_count * channels * slice_size * 4 / 2 ** 10 / 1e3, 'MB')
+    x_test = all_x[i_train:, :, :]
+    y_test = all_y[i_train:]
 
-    test_count = (100 - train_percent) * slice_per_chunk
-    print('Test count    ', test_count)
-    print('Test size     ',
-          test_count * channels * slice_size * 4 / 2 ** 10 / 1e3, 'MB')
-
-    np.random.shuffle(percent_chunks)
-    train_chunks = percent_chunks[:train_percent, :, :]
-    test_chuncks = percent_chunks[train_percent:, :, :]
-
-    train = batch(generate_slice_set(train_chunks, stride), )
-    print(train.shape)
-    save_array(train, './data/train.npy')
-    test = batch(generate_slice_set(test_chuncks, stride))
-    print(test.shape)
-    save_array(test, './data/test.npy')
+    save_array(x_test, './data/x_test.npy')
+    save_array(y_test, './data/y_test.npy')
+    save_array(x_train, './data/x_train.npy')
+    save_array(y_train, './data/y_train.npy')
 
 
 if __name__ == '__main__':

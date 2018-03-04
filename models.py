@@ -97,7 +97,7 @@ class FcStack(Model):
             b = self.b_list[i]
             activation = self.activation_list[i]
             codings = tf.matmul(codings, w) + b
-            mean, var = tf.nn.moments(codings, axes=[0,])
+            mean, var = tf.nn.moments(codings, axes=[0, ])
             codings = tf.nn.batch_normalization(codings, mean, var, None,
                                                 None, 1e-3)
             if activation is not None:
@@ -115,9 +115,13 @@ class FcStack(Model):
                 decoded = activation(decoded)
         return decoded
 
-    def cost(self, prepared_inputs):
-        reconstructed = self.decoder(self.encoder(prepared_inputs))
-        return tf.reduce_mean(tf.square(prepared_inputs - reconstructed))
+    def cost(self, prepared_inputs, y):
+        logits = self.encoder(prepared_inputs)
+        return tf.reduce_mean(
+            tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=logits,
+                labels=y)
+        )
 
 
 class ConvModel(Model):
@@ -251,7 +255,7 @@ class DeepConvModel(Model):
 
             mean, var = tf.nn.moments(output, axes=[0])
             output = tf.nn.batch_normalization(output, mean, var, None,
-                                                None, 1e-3)
+                                               None, 1e-3)
 
             if self.activations[i] is not None:
                 output = self.activations[i](output)

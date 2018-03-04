@@ -1,4 +1,4 @@
-all_input_files = $(wildcard *.wav) $(wildcard *.mp3) $(wildcard *.ogg) $(wildcard *.aif)
+all_input_files = $(shell find . -name *.aif -or -name *.wav -or -name *.mp3 -or -name *.ogg)
 
 all_raw_files = $(addsuffix .raw,$(basename $(all_input_files)))
 
@@ -19,4 +19,4 @@ all: $(all_raw_files)
 
 .PHONY: clean
 clean:
-	rm *.raw
+	rm $(shell find . -name *.raw)
