@@ -28,7 +28,7 @@ class LinearModel:
     def decoder(self, codings):
         return tf.matmul(codings - self.b, tf.transpose(self.w))
 
-    def cost(self, prepared_inputs):
+    def cost(self, prepared_inputs, _):
         reconstructed = self.decoder(self.encoder(prepared_inputs))
         return tf.reduce_mean(tf.square(prepared_inputs - reconstructed))
 

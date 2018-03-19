@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
-import prepare
-from config import model, channels, slice_size
+from synth import prepare
+from synth.config import model, channels, slice_size
 
 raw = tf.Variable(np.random.randn(2, slice_size, channels),
                   dtype=tf.float32)

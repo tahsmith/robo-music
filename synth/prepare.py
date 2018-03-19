@@ -7,7 +7,7 @@ from os import walk
 import tensorflow as tf
 
 from utils import conv_size
-from config import slice_size, channels, batch_size, model
+from .config import slice_size, channels, model
 
 samples_per_second = 44100
 

@@ -41,5 +41,6 @@ def regenerate(model, file_name):
 
 
 if __name__ == '__main__':
-    import config
+    from synth import config
+
     regenerate(config.model, sys.argv[1])

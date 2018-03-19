@@ -4,12 +4,11 @@ import numpy as np
 from utils import shuffle
 
 
-def optimiser(model, x_batch, y_batch):
+def training_ops(model, x_batch, y_batch):
     batches = model.prepare(x_batch)
     optimiser = tf.train.AdamOptimizer()
     cost = model.cost(batches, y_batch)
     y_pred = model.predict(batches)
-    y_pred = tf.argmax(tf.nn.softmax(y_pred), axis=1)
     _, accuracy_op = tf.metrics.accuracy(y_batch, y_pred)
     op = optimiser.minimize(cost)
     return op, cost, {
@@ -17,11 +16,9 @@ def optimiser(model, x_batch, y_batch):
     }
 
 
-def train(batch_size, n_epochs, model):
-    x_test = np.load('./data/x_test.npy')
-    y_test = np.load('./data/y_test.npy')
-    x_train = np.load('./data/x_train.npy')
-    y_train = np.load('./data/y_train.npy')
+def train(batch_size, n_epochs, model, test, train):
+    x_test, y_test = test
+    x_train, y_train = train
 
     n_train = x_train.shape[0]
     n_test = x_test.shape[0]
@@ -29,12 +26,12 @@ def train(batch_size, n_epochs, model):
     print(f'Test samples: {n_test}')
     batches = n_train // batch_size + 1
     x = tf.placeholder(tf.float32, [None, model.n_features])
-    y = tf.placeholder(tf.int32, [None])
-    op, cost, misc = optimiser(model, x, y)
+    y = x
+    op, cost, misc = training_ops(model, x, y)
     misc_summaries = [tf.summary.scalar(label, var) for label, var in
                       misc.items()]
 
-    tag = f'{model.__class__.__name__}' \
+    tag = f'synth' \
           f'-{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
 
     path = './save/' + tag
@@ -113,5 +110,14 @@ def train(batch_size, n_epochs, model):
 
 
 if __name__ == '__main__':
-    import config
-    train(config.batch_size, config.n_epochs, config.model)
+    from . import config
+
+    x_test = np.load('./data/x_test.npy')
+    # y_test = np.load('./data/y_test.npy')
+    y_test = x_test
+    x_train = np.load('./data/x_train.npy')
+    # y_train = np.load('./data/y_train.npy')
+    y_train = x_train
+    train(config.batch_size, config.n_epochs, config.model,
+          (x_test, y_test),
+          (x_train, y_test))

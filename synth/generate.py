@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib import ffmpeg
 
-from models import model, samples_per_second, timeslice_size
+from synth.models import model, samples_per_second, timeslice_size
 
 n = 10 * (samples_per_second // timeslice_size)
 random_encoded = tf.constant(
@@ -19,5 +19,5 @@ output_file = tf.write_file('output.wav', out_format)
 saver = tf.train.Saver()
 
 with tf.Session() as session:
-    saver.restore(session, './save/audio-autoencoder')
+    saver.restore(session, './save/audio-synth')
     session.run(output_file)
