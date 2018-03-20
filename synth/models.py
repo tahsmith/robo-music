@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from synth.config import slice_size, channels
+from .config import slice_size, channels
 import numpy as np
 
 

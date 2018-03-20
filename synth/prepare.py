@@ -7,9 +7,7 @@ from os import walk
 import tensorflow as tf
 
 from utils import conv_size
-from .config import slice_size, channels, model
-
-samples_per_second = 44100
+from .config import slice_size, channels, model, samples_per_second
 
 
 def save_array(x, filename):
@@ -49,11 +47,12 @@ def batch(slices):
 
 def list_categories():
     category_names = []
-    for root, dirs, files in walk('./data'):
+    root = './data/samples'
+    for root, dirs, files in walk(root):
         for dir in dirs:
             if dir[0] != '_':
                 category_names.append(dir)
-        if root != './data':
+        if root != root:
             break
 
     return category_names
@@ -61,7 +60,7 @@ def list_categories():
 
 def list_input_files():
     return {
-        k: glob.glob(os.path.join('./data', k, '*.raw'))
+        k: glob.glob(os.path.join('./data/samples', k, '*.raw'))
         for k in list_categories()
     }
 
@@ -139,10 +138,10 @@ def main():
     x_test = all_x[i_train:]
     y_test = all_y[i_train:]
 
-    save_array(x_test, './data/x_test.npy')
-    save_array(y_test, './data/y_test.npy')
-    save_array(x_train, './data/x_train.npy')
-    save_array(y_train, './data/y_train.npy')
+    save_array(x_test, './cache/synth/x_test.npy')
+    save_array(y_test, './cache/synth/y_test.npy')
+    save_array(x_train, './cache/synth/x_train.npy')
+    save_array(y_train, './cache/synth/y_train.npy')
 
 
 if __name__ == '__main__':

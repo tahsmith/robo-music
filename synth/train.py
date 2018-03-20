@@ -9,16 +9,19 @@ def training_ops(model, x_batch, y_batch):
     optimiser = tf.train.AdamOptimizer()
     cost = model.cost(batches, y_batch)
     y_pred = model.predict(batches)
-    _, accuracy_op = tf.metrics.accuracy(y_batch, y_pred)
+    accuracy_op = tf.reduce_mean(
+        tf.reduce_sum(tf.abs(y_pred - y_batch), axis=1)
+        / tf.reduce_sum(tf.abs(y_batch), axis=1)
+    )
     op = optimiser.minimize(cost)
     return op, cost, {
         'accuracy': accuracy_op
     }
 
 
-def train(batch_size, n_epochs, model, test, train):
-    x_test, y_test = test
-    x_train, y_train = train
+def train(batch_size, n_epochs, model, test_data, train_data):
+    x_test, y_test = test_data
+    x_train, y_train = train_data
 
     n_train = x_train.shape[0]
     n_test = x_test.shape[0]
@@ -57,14 +60,14 @@ def train(batch_size, n_epochs, model, test, train):
             print(f'Epoch {epoch + 1}')
 
             log_counter = 0
-            x_train, y_train = shuffle(x_train, y_train)
+            x_train = shuffle(x_train)
             for i in range(batches):
                 start = i * batch_size
                 end = min((i + 1) * batch_size, n_train)
                 if start == end:
                     return
                 x_batch = x_train[start:end]
-                y_batch = y_train[start:end]
+                y_batch = x_train[start:end]
                 session.run(op, feed_dict={
                     x: x_batch,
                     y: y_batch,
@@ -112,12 +115,12 @@ def train(batch_size, n_epochs, model, test, train):
 if __name__ == '__main__':
     from . import config
 
-    x_test = np.load('./data/x_test.npy')
-    # y_test = np.load('./data/y_test.npy')
+    x_test = np.load('./cache/synth/x_test.npy')
+    # y_test = np.load('./cache/synth/y_test.npy')
     y_test = x_test
-    x_train = np.load('./data/x_train.npy')
-    # y_train = np.load('./data/y_train.npy')
+    x_train = np.load('./cache/synth/x_train.npy')
+    # y_train = np.load('./cache/synth/y_train.npy')
     y_train = x_train
     train(config.batch_size, config.n_epochs, config.model,
           (x_test, y_test),
-          (x_train, y_test))
+          (x_train, y_train))
