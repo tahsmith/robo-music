@@ -1,4 +1,3 @@
-
 samples_per_second = 44100
 channels = 1
 
@@ -13,5 +12,6 @@ from . import models
 
 model = models.FcStack(
     feature_size, coding_size,
-    depth=2
+    depth=5,
+    reuse=False
 )

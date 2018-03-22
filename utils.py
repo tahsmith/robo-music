@@ -22,5 +22,6 @@ def shuffle(*arrays):
     else:
         return shuffled
 
+
 def whole_multiple(x, y):
     return x - x % y
