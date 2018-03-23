@@ -48,10 +48,14 @@ class FcStack:
         self.encoding_activation_list = [
             activation for _ in range(depth - 1)
         ]
+        self.encoding_activation_list.append(tf.nn.sigmoid)
 
-        self.encoding_activation_list.append(None)
-        self.decoding_activation_list = \
-            list(reversed(self.encoding_activation_list))
+        self.decoding_activation_list = [None] + [
+            activation for _ in range(depth - 1)
+        ]
+
+        self.noise = tf.placeholder(dtype=tf.float32)
+        self.dropout_rate = tf.placeholder(dtype=tf.float32)
 
     def fc_layer(self, input_size, coding_size):
         return tf.Variable(tf.random_normal(
@@ -74,18 +78,20 @@ class FcStack:
         return tf.reshape(x, (-1, self.n_features))
 
     def encoder(self, prepared_inputs):
-        codings = prepared_inputs
+        codings = prepared_inputs + tf.random_normal(tf.shape(
+            prepared_inputs), self.noise)
         for i in range(len(self.w_encode_list)):
             w = self.w_encode_list[i]
             b = self.b_encode_list[i]
             activation = self.encoding_activation_list[i]
             codings = tf.matmul(codings, w) + b
-            # mean, var = tf.nn.moments(codings, axes=[0,])
-            # codings = tf.nn.batch_normalization(codings, mean, var, None,
-            #                                     None, 1e-3)
             if activation is not None:
+                mean, var = tf.nn.moments(codings, axes=[0])
+                codings = tf.nn.batch_normalization(codings, mean, var, None,
+                                                    None, 1e-3)
                 codings = activation(codings)
-        return codings
+
+        return tf.layers.dropout(codings, self.dropout_rate)
 
     def decoder(self, codings):
         decoded = codings
@@ -94,10 +100,10 @@ class FcStack:
             b = self.b_decode_list[i]
             activation = self.decoding_activation_list[i]
             decoded = tf.matmul(decoded, tf.transpose(w)) + b
-            # mean, var = tf.nn.moments(decoded, axes=[0,])
-            # decoded = tf.nn.batch_normalization(decoded, mean, var, None,
-            #                                     None, 1e-3)
             if activation is not None:
+                mean, var = tf.nn.moments(decoded, axes=[0])
+                decoded = tf.nn.batch_normalization(decoded, mean, var, None,
+                                                    None, 1e-3)
                 decoded = activation(decoded)
         return decoded
 
@@ -109,7 +115,13 @@ class FcStack:
         return self.decoder(self.encoder(batches))
 
     def training_feeds(self):
-        return {}
+        return {
+            self.noise: 0.0,
+            self.dropout_rate: 0.0
+        }
 
     def testing_feeds(self):
-        return {}
+        return {
+            self.noise: 0.0,
+            self.dropout_rate: 0.0
+        }

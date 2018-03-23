@@ -81,11 +81,16 @@ def create_samples(waveform, cat):
     stride = slice_size // 32
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
     samples = np.empty((n_samples, slice_size, channels))
+    drop = np.zeros(samples.shape[0], dtype=np.uint32)
     for i in range(n_samples):
         begin = i * stride
         end = begin + slice_size
         assert (end <= waveform.shape[0])
-        samples[i, :, :] = waveform[begin:end]
+        slice = waveform[begin:end]
+        if np.sqrt(np.sum(np.square(slice))) < 0.1:
+            drop[i] = 1
+        samples[i, :, :] = slice
+    samples = samples[drop != 0, :]
     return samples, np.ones((samples.shape[0],), dtype=np.uint8) * cat
 
 
