@@ -1,4 +1,8 @@
+import glob
+
 import tensorflow as tf
+from tensorflow.python.framework.errors_impl import NotFoundError
+
 from . import config
 from utils import whole_multiple
 
@@ -21,18 +25,37 @@ def _get_session():
     if _session is None:
         _session = tf.Session()
         _session.run(tf.global_variables_initializer())
+        saver = tf.train.Saver()
+        try:
+            saver.restore(_session, './save/synth')
+        except NotFoundError:
+            pass
     return _session
 
 
-_waveform = tf.placeholder(tf.float32, (None, config.channels))
+_waveform = tf.placeholder(tf.float32, (None, config.channels), 'waveform')
 _waveform_to_codings_op = config.model.encoder(
-    config.model.prepare(config.model.preprocess(clip_to_slice_multiple(
+    config.model.prepare(config.model.generate_features(clip_to_slice_multiple(
         normalise(
             _waveform)))
     )
 )
 
+_codings = tf.placeholder(tf.float32, (None, config.coding_size), 'codings')
+_codings_to_waveform_op = tf.reshape(config.model.data_from_features(
+    config.model.decoder(_codings)),
+    (-1, config.channels)
+)
+
 
 def waveform_to_codings(waveform):
-    return _get_session().run(_waveform_to_codings_op, feed_dict={_waveform:
-                                                                waveform})
+    return _get_session().run(_waveform_to_codings_op, feed_dict={
+        _waveform: waveform,
+        **config.model.testing_feeds()
+    })
+
+
+def codings_to_waveform(codings):
+    return _get_session().run(_codings_to_waveform_op, feed_dict={
+        _codings: codings
+    })

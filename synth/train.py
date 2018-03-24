@@ -37,7 +37,7 @@ def train(batch_size, n_epochs, model, test_data, train_data):
     tag = f'synth' \
           f'-{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
 
-    path = './save/' + tag
+    path = './save/synth'
     saver = tf.train.Saver()
 
     test_cost_summary = tf.summary.scalar('test cost', cost)

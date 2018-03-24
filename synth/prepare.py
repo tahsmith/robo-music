@@ -59,10 +59,7 @@ def list_categories():
 
 
 def list_input_files():
-    return {
-        k: glob.glob(os.path.join('./data/samples', k, '*.raw'))
-        for k in list_categories()
-    }
+    return glob.glob('data/**/*.raw', recursive=True)
 
 
 def concat_raw_from_files(file_list):
@@ -81,16 +78,12 @@ def create_samples(waveform, cat):
     stride = slice_size // 32
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
     samples = np.empty((n_samples, slice_size, channels))
-    drop = np.zeros(samples.shape[0], dtype=np.uint32)
     for i in range(n_samples):
         begin = i * stride
         end = begin + slice_size
         assert (end <= waveform.shape[0])
         slice = waveform[begin:end]
-        if np.sqrt(np.sum(np.square(slice))) < 0.1:
-            drop[i] = 1
         samples[i, :, :] = slice
-    samples = samples[drop != 0, :]
     return samples, np.ones((samples.shape[0],), dtype=np.uint8) * cat
 
 
@@ -100,14 +93,14 @@ def main():
     all_y = np.empty((0,), dtype=np.uint8)
 
     input_files = list_input_files()
-    for k, v in input_files.items():
-        print(f'{k}: {len(v)}')
+    # for k, v in input_files.items():
+    #     print(f'{k}: {len(v)}')
 
     x = tf.placeholder(tf.float32, (None, slice_size, channels))
-    features_op = model.preprocess(x)
+    features_op = model.generate_features(x)
     with tf.Session() as session:
-        for k, v in input_files.items():
-            all_data_for_cat = concat_raw_from_files(v)
+        for v in input_files:
+            all_data_for_cat = concat_raw_from_files([v])
             seconds = all_data_for_cat.shape[0] / samples_per_second
 
             cat_x = np.empty((0, model.n_features), dtype=np.float32)
@@ -126,7 +119,7 @@ def main():
 
             all_x = np.concatenate((all_x, cat_x), axis=0)
             all_y = np.concatenate((all_y, cat_y), axis=0)
-            print(f'{i} {k}: {seconds:0.2f}s {cat_x.shape[0]} samples')
+            print(f'{i} {v}: {seconds:0.2f}s {cat_x.shape[0]} samples')
             i += 1
 
     n_samples = all_x.shape[0]

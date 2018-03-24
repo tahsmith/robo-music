@@ -1,46 +1,25 @@
+import os
 import sys
 import tensorflow as tf
 from tensorflow.contrib import ffmpeg
+from . import config, transform
+from utils import load_sound_file, write_sound_file, normalise_to_int_range
+import numpy as np
 
-samples_per_second = 44100
 
-
-def regenerate(model, file_name):
-    input_file = tf.read_file(file_name)
-    input_data = ffmpeg.decode_audio(input_file,
-                                     file_format=file_name.split('.')[-1],
-                                     samples_per_second=samples_per_second,
-                                     channel_count=1)
-    input_len = tf.shape(input_data)[0]
-    input_data = tf.reshape(
-        tf.slice(
-            input_data,
-            [0, 0],
-            [input_len - input_len % model.slice_size, 1]
-        ),
-        [-1, model.slice_size, 1]
-    )
-
-    decoded = model.reconstructed(model.prepare(input_data))
-    slices_output = decoded
-    output_data = tf.reshape(slices_output, (-1, 1))
-    output_wav = ffmpeg.encode_audio(output_data,
-                                     file_format='wav',
-                                     samples_per_second=samples_per_second)
-    output_file = tf.write_file(r'./regenerated.wav', output_wav)
-    saver = tf.train.Saver()
-
-    with tf.Session() as session:
-        saver.restore(session, sys.argv[2])
-        session.run(
-            output_file,
-            feed_dict={
-                **model.testing_feeds()
-            }
-        )
+def regenerate(file_name):
+    waveform = load_sound_file(file_name, np.int16,
+                               config.samples_per_second,
+                               config.channels)
+    codings = transform.waveform_to_codings(waveform)
+    regenerated = transform.codings_to_waveform(codings)
+    regenerated = normalise_to_int_range(regenerated, np.int16)
+    *base_name, extn = file_name.split('.')
+    base_name = '.'.join(base_name)
+    regenerated_file_name = base_name + '_regenerated.' + extn
+    write_sound_file(regenerated, regenerated_file_name,
+                     config.samples_per_second)
 
 
 if __name__ == '__main__':
-    from synth import config
-
-    regenerate(config.model, sys.argv[1])
+    regenerate(sys.argv[1])

@@ -1,19 +1,20 @@
 from sys import argv
-
 import math
 from tensorflow.contrib import rnn
-
 import tensorflow as tf
 import numpy as np
-# import matplotlib.pyplot as plt
 from contexttimer import Timer
 
 from synth import prepare
 
 slice_size = 612
 fft_size = slice_size // 2 + 1
+steps_seconds = 2.0
+n_steps = math.ceil(steps_seconds * prepare.samples_per_second / slice_size)
+n_inputs = 2 * fft_size
+n_neurons = 20
+n_outputs = 2 * fft_size
 
-learning_rate = 0.001
 
 X = tf.placeholder(tf.float32, [None, n_steps, n_inputs], name='X')
 y = tf.placeholder(tf.float32, [None, n_steps, n_outputs], name='y')
