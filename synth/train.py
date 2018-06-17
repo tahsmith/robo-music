@@ -23,12 +23,15 @@ def train(batch_size, n_epochs, model, test_data, train_data):
     x_test, y_test = test_data
     x_train, y_train = train_data
 
+    x_test = x_test[:65535, :, :]
+    y_test = y_test[:65535, :, :]
+
     n_train = x_train.shape[0]
     n_test = x_test.shape[0]
     print(f'Training samples: {n_train}')
     print(f'Test samples: {n_test}')
     batches = n_train // batch_size + 1
-    x = tf.placeholder(tf.float32, [None, model.n_features])
+    x = tf.placeholder(tf.float32, [None, config.slice_size, config.channels])
     y = x
     op, cost, misc = training_ops(model, x, y)
     misc_summaries = [tf.summary.scalar(label, var) for label, var in

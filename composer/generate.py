@@ -12,13 +12,13 @@ from . import model
 
 
 def generate():
-    batch = np.random.randn(1, config.n_steps, config.n_inputs)
+    batch = np.random.uniform(0.0, 0.1, (1, config.n_steps, config.n_inputs))
     wave_form = np.zeros((0, config.n_inputs))
 
     saver = tf.train.Saver()
     with tf.Session() as sess:
         saver.restore(sess, './save/composer')
-        for i in range(60 * synth.config.samples_per_second //
+        for i in range(120 * synth.config.samples_per_second //
                        synth.config.slice_size):
             new_point = sess.run(model.outputs,
                                  feed_dict={model.codings: batch})

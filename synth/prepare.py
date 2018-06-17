@@ -89,38 +89,33 @@ def create_samples(waveform, cat):
 
 def main():
     i = 0
-    all_x = np.empty((0, model.n_features), dtype=np.float32)
+    all_x = np.empty((0,slice_size, channels), dtype=np.float32)
     all_y = np.empty((0,), dtype=np.uint8)
 
     input_files = list_input_files()
     # for k, v in input_files.items():
     #     print(f'{k}: {len(v)}')
 
-    x = tf.placeholder(tf.float32, (None, slice_size, channels))
-    features_op = model.generate_features(x)
-    with tf.Session() as session:
-        for v in input_files:
-            all_data_for_cat = concat_raw_from_files([v])
-            seconds = all_data_for_cat.shape[0] / samples_per_second
+    for v in input_files:
+        all_data_for_cat = concat_raw_from_files([v])
+        seconds = all_data_for_cat.shape[0] / samples_per_second
 
-            cat_x = np.empty((0, model.n_features), dtype=np.float32)
-            cat_y = np.empty((0,), dtype=np.uint8)
-            preprocessing_batch_size = 400000
-            for j in range(i, all_data_for_cat.shape[0],
-                           preprocessing_batch_size):
-                begin = j
-                end = min(j + preprocessing_batch_size,
-                          all_data_for_cat.shape[0])
-                samples, y = create_samples(all_data_for_cat[begin:end], i)
-                features = session.run(features_op, {x: samples})
-                assert (features.shape[0] == y.shape[0])
-                cat_x = np.concatenate((cat_x, features), axis=0)
-                cat_y = np.concatenate((cat_y, y), axis=0)
+        cat_x = np.empty((0, slice_size, channels), dtype=np.float32)
+        cat_y = np.empty((0,), dtype=np.uint8)
+        preprocessing_batch_size = 400000
+        for j in range(i, all_data_for_cat.shape[0],
+                       preprocessing_batch_size):
+            begin = j
+            end = min(j + preprocessing_batch_size,
+                      all_data_for_cat.shape[0])
+            samples, y = create_samples(all_data_for_cat[begin:end], i)
+            cat_x = np.concatenate((cat_x, samples), axis=0)
+            cat_y = np.concatenate((cat_y, y), axis=0)
 
-            all_x = np.concatenate((all_x, cat_x), axis=0)
-            all_y = np.concatenate((all_y, cat_y), axis=0)
-            print(f'{i} {v}: {seconds:0.2f}s {cat_x.shape[0]} samples')
-            i += 1
+        all_x = np.concatenate((all_x, cat_x), axis=0)
+        all_y = np.concatenate((all_y, cat_y), axis=0)
+        print(f'{i} {v}: {seconds:0.2f}s {cat_x.shape[0]} samples')
+        i += 1
 
     n_samples = all_x.shape[0]
     indices = np.arange(0, n_samples)
