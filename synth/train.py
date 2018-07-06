@@ -23,8 +23,8 @@ def train(batch_size, n_epochs, model, test_data, train_data):
     x_test, y_test = test_data
     x_train, y_train = train_data
 
-    x_test = x_test[:65535, :, :]
-    y_test = y_test[:65535, :, :]
+    x_test = x_test[:500, :, :]
+    y_test = y_test[:500, :, :]
 
     n_train = x_train.shape[0]
     n_test = x_test.shape[0]

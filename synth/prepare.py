@@ -59,13 +59,13 @@ def list_categories():
 
 
 def list_input_files():
-    return glob.glob('data/**/*.raw', recursive=True)
+    return glob.glob('cache/**/*.npy', recursive=True)
 
 
 def concat_raw_from_files(file_list):
     all_data = np.zeros((0, 1), np.float32)
     for file in file_list:
-        waveform = np.fromfile(file, dtype='<i2')
+        waveform = np.load(file)
         waveform = np.array(waveform, dtype=np.float32)
         waveform = np.reshape(waveform, (-1, channels))
         waveform = (waveform - np.mean(waveform)) / np.std(waveform)
@@ -75,7 +75,7 @@ def concat_raw_from_files(file_list):
 
 def create_samples(waveform, cat):
     waveform = waveform[:waveform.shape[0] - waveform.shape[0] % slice_size, :]
-    stride = slice_size // 32
+    stride = slice_size // 4
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
     samples = np.empty((n_samples, slice_size, channels))
     for i in range(n_samples):
@@ -131,6 +131,10 @@ def main():
     x_test = all_x[i_train:]
     y_test = all_y[i_train:]
 
+    try:
+        os.mkdir('./cache/synth/')
+    except FileExistsError:
+        pass
     save_array(x_test, './cache/synth/x_test.npy')
     save_array(y_test, './cache/synth/y_test.npy')
     save_array(x_train, './cache/synth/x_train.npy')
