@@ -6,15 +6,30 @@ import os
 
 import sys
 
-
 N_FEATURES = 128
+SAMPLE_RATE = 11025
+FRAME_SIZE = 2048
+FRAME_TIME = FRAME_SIZE / SAMPLE_RATE
 
 
-def make_features(waveform, sample_rate):
-    spec = librosa.feature.melspectrogram(waveform.reshape((-1,)), sample_rate)
-    log_spec = librosa.core.amplitude_to_db(spec, ref=np.max)
-    avg_log_spec = np.mean(log_spec, axis=1)
-    return avg_log_spec
+def make_features(waveform):
+    spec = librosa.feature.melspectrogram(
+        waveform.reshape((-1,)),
+        SAMPLE_RATE,
+        n_fft=FRAME_SIZE,
+        hop_length=FRAME_SIZE // 8,
+        n_mels=N_FEATURES
+    )
+
+    spec = spec.transpose((1, 0))
+    return spec
+
+
+def sample_to_batch(waveform, category):
+    features = make_features(waveform)
+    n_frames = features.shape[0]
+    categories = np.ones((n_frames,), dtype=np.int32) * category
+    return features, categories
 
 
 def list_categories():
@@ -38,30 +53,27 @@ def save_array(x, filename):
 
 
 def main(argv):
-    sample_rate = 11025
     categories = list_categories()
 
-    n = 0
     for i, category in enumerate(categories):
         print('{}: {}'.format(i, category))
-        n += len(get_samples(category))
 
-    x = np.empty((n, N_FEATURES), np.float32)
-    y = np.empty(n, dtype=np.int32)
+    x = np.empty((0, N_FEATURES), np.float32)
+    y = np.empty(0, dtype=np.int32)
 
     i = 0
     for cat_i, category in enumerate(categories):
         for file in get_samples(category):
             waveform = np.load(file)
-            x[i, :] = make_features(waveform, sample_rate)
-            y[i] = cat_i
-            i += 1
+            x_batch, y_batch = sample_to_batch(waveform, cat_i)
+            x = np.concatenate((x, x_batch))
+            y = np.concatenate((y, y_batch))
             print(file)
-    
+
     n_samples = x.shape[0]
     indices = np.arange(0, n_samples)
     np.random.shuffle(indices)
-    x = x[indices]
+    x = x[indices, :]
     y = y[indices]
 
     train_percent = 90
@@ -71,7 +83,12 @@ def main(argv):
 
     x_test = x[i_train:]
     y_test = y[i_train:]
-    
+
+    print("Summary:")
+    print('features  {}'.format(N_FEATURES))
+    print('training  {}'.format(i_train))
+    print('test:     {}'.format(n_samples - i_train))
+
     try:
         os.mkdir('./cache/classifier/')
     except FileExistsError:

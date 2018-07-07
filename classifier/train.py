@@ -17,21 +17,22 @@ def main(argv):
         {'x': x_train},
         y_train,
         shuffle=True,
-        batch_size=100,
+        batch_size=1000,
         num_epochs=None,
     )
 
-    estimator.train(
-        input_fn=train_input_fn,
-        steps=20000,
-    )
-
-    tets_input_fn = tf.estimator.inputs.numpy_input_fn(
+    test_input_fn = tf.estimator.inputs.numpy_input_fn(
         {'x': x_test},
         y_test,
         shuffle=True
     )
-    estimator.evaluate(input_fn=tets_input_fn, steps=100)
+
+    for i in range(100):
+        estimator.train(
+            input_fn=train_input_fn,
+            steps=1000,
+        )
+        estimator.evaluate(input_fn=test_input_fn, steps=1)
 
 
 if __name__ == '__main__':
