@@ -19,14 +19,46 @@ def training_ops(model, x_batch, y_batch):
     }
 
 
-def train(batch_size, n_epochs, model_fn, test_data, train_data, model_dir):
-    x_test, y_test = test_data
-    x_train, y_train = train_data
+def main():
+    from config import config_dict
+    config = config_dict['synth']
 
-    estimator = tf.estimator.Estimator(model_fn, model_dir=model_dir)
+    waveform_test = np.load('./cache/synth/waveform_test.npy')
+    x_test = waveform_test[:, 0:-1]
+    y_test = waveform_test[:, -1]
+    features_test = np.load('./cache/synth/features_test.npy')
+
+    all_train = np.load('./cache/synth/waveform_train.npy')
+    x_train = all_train[:, 0:-1]
+    y_train = all_train[:, -1]
+    features_train = np.load('./cache/synth/features_train.npy')
+
+    model_fn = tf.estimator.LinearRegressor(
+        [
+            tf.feature_column.numeric_column(
+                'x',
+                shape=(
+                    config_dict['synth']['slice_size'] - 1,
+                    config_dict['audio']['channels']
+                )
+            ),
+            tf.feature_column.numeric_column(
+                'conditioning',
+                shape=(
+                    128,
+                )
+            )
+        ]
+    ).model_fn
+
+    estimator = tf.estimator.Estimator(
+        model_fn,
+        model_dir=config_dict['data']['logs']
+                  + f'/synth/{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
+    )
 
     train_input_fn = tf.estimator.inputs.numpy_input_fn(
-        {'x': x_train},
+        {'x': x_train, 'conditioning': features_train},
         y_train,
         shuffle=True,
         batch_size=1000,
@@ -34,7 +66,7 @@ def train(batch_size, n_epochs, model_fn, test_data, train_data, model_dir):
     )
 
     test_input_fn = tf.estimator.inputs.numpy_input_fn(
-        {'x': x_test},
+        {'x': x_test, 'conditioning': features_test},
         y_test,
         shuffle=True,
         batch_size=1000,
@@ -47,38 +79,6 @@ def train(batch_size, n_epochs, model_fn, test_data, train_data, model_dir):
             steps=1000,
         )
         estimator.evaluate(input_fn=test_input_fn, steps=1)
-
-
-def main():
-    from config import config_dict
-    config = config_dict['synth']
-
-    all_test = np.load('./cache/synth/x_test.npy')
-    x_test = all_test[:, 0:-1]
-    y_test = all_test[:, -1]
-    all_train = np.load('./cache/synth/x_train.npy')
-    x_train = all_train[:, 0:-1]
-    y_train = all_train[:, -1]
-
-    model_fn = tf.estimator.LinearRegressor(
-        [tf.feature_column.numeric_column(
-            'x',
-            shape=(
-                config_dict['synth']['slice_size'] - 1,
-                config_dict['audio']['channels']
-            )
-        )]
-    ).model_fn
-
-    train(
-        config['batch_size'],
-        config['epoch_count'],
-        model_fn,
-        (x_test, y_test),
-        (x_train, y_train),
-        config_dict['data']['logs']
-        + f'/synth/{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
-    )
 
 
 if __name__ == '__main__':

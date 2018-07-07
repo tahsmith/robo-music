@@ -2,6 +2,7 @@ import glob
 import os
 from itertools import product
 
+import librosa
 import numpy as np
 from os import walk
 import tensorflow as tf
@@ -63,9 +64,27 @@ def concat_raw_from_files(file_list, channels):
     return all_data
 
 
-def create_samples(waveform, cat, slice_size, channels):
-    waveform = waveform[:waveform.shape[0] - waveform.shape[0] % slice_size, :]
-    stride = slice_size // 4
+def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
+    if waveform.shape[1] == 1:
+        waveform = waveform.reshape((-1))
+
+    spec = np.abs(librosa.stft(waveform, n_fft=slice_size, hop_length=stride,
+                  center=False)) ** 2
+
+    spec = librosa.feature.melspectrogram(
+        waveform,
+        sample_rate,
+        S=spec,
+        n_mels=n_mels
+    )
+
+    spec = spec.transpose((1, 0))
+
+    return spec
+
+
+def create_samples(waveform, slice_size, stride):
+    channels = waveform.shape[1]
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
     # guard against waveform being too small to make a sample
     n_samples = max(n_samples, 0)
@@ -76,7 +95,7 @@ def create_samples(waveform, cat, slice_size, channels):
         assert (end <= waveform.shape[0])
         slice_ = waveform[begin:end]
         samples[i, :, :] = slice_
-    return samples, np.ones((samples.shape[0],), dtype=np.uint8) * cat
+    return samples
 
 
 def main():
@@ -84,28 +103,41 @@ def main():
     slice_size = config_dict['synth']['slice_size']
     channels = config_dict['audio']['channels']
     samples_per_second = config_dict['audio']['sample_rate']
+    n_mels = 128
     i = 0
     all_x = np.empty((0, slice_size, channels), dtype=np.float32)
-    all_y = np.empty((0,), dtype=np.uint8)
+    all_y = np.empty((0, n_mels), dtype=np.uint8)
 
     input_files = list_input_files()
     # for k, v in input_files.items():
     #     print(f'{k}: {len(v)}')
+
+    # number of data points generated per slice.
+    stride = slice_size // 4
 
     for v in input_files:
         all_data_for_cat = concat_raw_from_files([v], channels)
         seconds = all_data_for_cat.shape[0] / samples_per_second
 
         cat_x = np.empty((0, slice_size, channels), dtype=np.float32)
-        cat_y = np.empty((0,), dtype=np.uint8)
+        cat_y = np.empty((0, n_mels), dtype=np.uint8)
         preprocessing_batch_size = 400000
         for j in range(i, all_data_for_cat.shape[0],
                        preprocessing_batch_size):
             begin = j
             end = min(j + preprocessing_batch_size,
                       all_data_for_cat.shape[0])
-            samples, y = create_samples(all_data_for_cat[begin:end], i,
-                                        slice_size, channels)
+            waveform = all_data_for_cat[begin:end]
+            waveform = waveform[
+                       :waveform.shape[0] - waveform.shape[0] % slice_size, :]
+            if waveform.shape[0] == 0:
+                continue
+            samples = create_samples(waveform, slice_size, stride)
+            y = compute_features(waveform, samples_per_second, slice_size,
+                                 stride, n_mels)
+
+            assert samples.shape[0] == y.shape[0]
+
             cat_x = np.concatenate((cat_x, samples), axis=0)
             cat_y = np.concatenate((cat_y, y), axis=0)
 
@@ -132,10 +164,10 @@ def main():
         os.mkdir('./cache/synth/')
     except FileExistsError:
         pass
-    save_array(x_test, './cache/synth/x_test.npy')
-    save_array(y_test, './cache/synth/y_test.npy')
-    save_array(x_train, './cache/synth/x_train.npy')
-    save_array(y_train, './cache/synth/y_train.npy')
+    save_array(x_test, './cache/synth/waveform_test.npy')
+    save_array(y_test, './cache/synth/features_test.npy')
+    save_array(x_train, './cache/synth/waveform_train.npy')
+    save_array(y_train, './cache/synth/features_train.npy')
 
 
 if __name__ == '__main__':
