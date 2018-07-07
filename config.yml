@@ -1,0 +1,13 @@
+data:
+  input: './data'
+  cache: './cache'
+  logs: './logs'
+
+audio:
+  sample_rate: 11025
+  channels: 1
+
+synth:
+  slice_size: 2048
+  batch_size: 100
+  epoch_count: 1

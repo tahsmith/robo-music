@@ -7,7 +7,6 @@ from os import walk
 import tensorflow as tf
 
 from utils import conv_size
-from .config import slice_size, channels, model, samples_per_second
 
 
 def save_array(x, filename):
@@ -20,7 +19,7 @@ def make_batch(all_data, start, size, timeslice_size):
     return all_data[indices.astype(np.int32)]
 
 
-def generate_slice_set(chunks, stride):
+def generate_slice_set(chunks, stride, slice_size):
     chunk_size = chunks.shape[1]
     chunk_count = chunks.shape[0]
     slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
@@ -36,22 +35,13 @@ def generate_slice_set(chunks, stride):
             yield chunks[i_chunk, begin:end, :]
 
 
-def batch(slices):
-    slices = list(slices)
-    batch = np.empty((len(slices), slice_size, channels))
-    for i, slice in enumerate(slices):
-        batch[i, :, :] = slice
-
-    return batch
-
-
 def list_categories():
     category_names = []
     root = './data/samples'
     for root, dirs, files in walk(root):
-        for dir in dirs:
-            if dir[0] != '_':
-                category_names.append(dir)
+        for dir_ in dirs:
+            if dir_[0] != '_':
+                category_names.append(dir_)
         if root != root:
             break
 
@@ -59,10 +49,10 @@ def list_categories():
 
 
 def list_input_files():
-    return glob.glob('cache/**/*.npy', recursive=True)
+    return glob.glob('cache/samples/**/*.npy', recursive=True)
 
 
-def concat_raw_from_files(file_list):
+def concat_raw_from_files(file_list, channels):
     all_data = np.zeros((0, 1), np.float32)
     for file in file_list:
         waveform = np.load(file)
@@ -73,23 +63,29 @@ def concat_raw_from_files(file_list):
     return all_data
 
 
-def create_samples(waveform, cat):
+def create_samples(waveform, cat, slice_size, channels):
     waveform = waveform[:waveform.shape[0] - waveform.shape[0] % slice_size, :]
     stride = slice_size // 4
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
+    # guard against waveform being too small to make a sample
+    n_samples = max(n_samples, 0)
     samples = np.empty((n_samples, slice_size, channels))
     for i in range(n_samples):
         begin = i * stride
         end = begin + slice_size
         assert (end <= waveform.shape[0])
-        slice = waveform[begin:end]
-        samples[i, :, :] = slice
+        slice_ = waveform[begin:end]
+        samples[i, :, :] = slice_
     return samples, np.ones((samples.shape[0],), dtype=np.uint8) * cat
 
 
 def main():
+    from config import config_dict
+    slice_size = config_dict['synth']['slice_size']
+    channels = config_dict['audio']['channels']
+    samples_per_second = config_dict['audio']['sample_rate']
     i = 0
-    all_x = np.empty((0,slice_size, channels), dtype=np.float32)
+    all_x = np.empty((0, slice_size, channels), dtype=np.float32)
     all_y = np.empty((0,), dtype=np.uint8)
 
     input_files = list_input_files()
@@ -97,7 +93,7 @@ def main():
     #     print(f'{k}: {len(v)}')
 
     for v in input_files:
-        all_data_for_cat = concat_raw_from_files([v])
+        all_data_for_cat = concat_raw_from_files([v], channels)
         seconds = all_data_for_cat.shape[0] / samples_per_second
 
         cat_x = np.empty((0, slice_size, channels), dtype=np.float32)
@@ -108,7 +104,8 @@ def main():
             begin = j
             end = min(j + preprocessing_batch_size,
                       all_data_for_cat.shape[0])
-            samples, y = create_samples(all_data_for_cat[begin:end], i)
+            samples, y = create_samples(all_data_for_cat[begin:end], i,
+                                        slice_size, channels)
             cat_x = np.concatenate((cat_x, samples), axis=0)
             cat_y = np.concatenate((cat_y, y), axis=0)
 
