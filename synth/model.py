@@ -13,12 +13,12 @@ def add_conditioning(inputs, conditioning):
     return output
 
 
-def layer(inputs, conv_fn, conditioning_inputs):
+def layer(inputs, conv_fn, conditioning_inputs, mode):
     filter_ = conv_fn(inputs)
     gate = conv_fn(inputs)
 
-    filter_ = add_conditioning(filter_, conditioning_inputs)
-    gate = add_conditioning(gate, conditioning_inputs)
+    # filter_ = add_conditioning(filter_, conditioning_inputs)
+    # gate = add_conditioning(gate, conditioning_inputs)
 
     return tf.sigmoid(gate) * tf.tanh(filter_)
 
@@ -38,9 +38,13 @@ def model(features, labels, mode):
     output = waveform
 
     for i in range(5):
-        output = layer(output, conv, conditioning)
+        output = layer(output, conv, conditioning, mode)
 
-    output = tf.layers.dense(tf.layers.flatten(output), 1)
+    flatten = tf.layers.flatten(output)
+    dropout = tf.layers.dropout(flatten,
+                                training=mode == tf.estimator.ModeKeys.TRAIN)
+    logits = tf.layers.dense(dropout, 256)
+    predictions = tf.argmax(logits, axis=1)
 
     loss = tf.reduce_sum(tf.square(output - labels))
 

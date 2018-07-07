@@ -113,7 +113,7 @@ def main():
     #     print(f'{k}: {len(v)}')
 
     # number of data points generated per slice.
-    stride = slice_size // 4
+    stride = slice_size // 8
 
     for v in input_files:
         all_data_for_cat = concat_raw_from_files([v], channels)
@@ -159,6 +159,11 @@ def main():
 
     x_test = all_x[i_train:]
     y_test = all_y[i_train:]
+
+    print("Summary:")
+    print('features  {}'.format(n_mels))
+    print('training  {}'.format(i_train))
+    print('test:     {}'.format(n_samples - i_train))
 
     try:
         os.mkdir('./cache/synth/')

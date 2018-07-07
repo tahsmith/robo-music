@@ -31,7 +31,7 @@ def main():
         y_train,
         shuffle=True,
         batch_size=1000,
-        num_epochs=None,
+        num_epochs=200,
     )
 
     test_input_fn = tf.estimator.inputs.numpy_input_fn(
@@ -39,7 +39,7 @@ def main():
         y_test,
         shuffle=True,
         batch_size=1000,
-        num_epochs=None,
+        num_epochs=1,
     )
 
     for i in range(100):
