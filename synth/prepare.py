@@ -82,7 +82,7 @@ def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
         n_mels=n_mels
     )
 
-    spec = spec.transpose((1, 0))
+    spec = spec.transpose((1, 0)).astype(np.float32)
 
     return spec
 
