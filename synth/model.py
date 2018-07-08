@@ -25,7 +25,7 @@ def layer(inputs, conv_fn, conditioning_inputs, mode):
 
 def conv(inputs):
     return tf.layers.conv1d(inputs,
-                            filters=10,
+                            filters=32,
                             kernel_size=2,
                             strides=2,
                             padding='valid')
@@ -41,7 +41,7 @@ def model(features, labels, mode):
     )
     encoded = tf.reshape(encoded, [-1, 2047, 256])
 
-    output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=10)
+    output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=32)
 
     for i in range(5):
         output = layer(output, conv, conditioning, mode)
