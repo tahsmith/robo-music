@@ -17,8 +17,8 @@ def layer(inputs, conv_fn, conditioning_inputs, mode):
     filter_ = conv_fn(inputs)
     gate = conv_fn(inputs)
 
-    # filter_ = add_conditioning(filter_, conditioning_inputs)
-    # gate = add_conditioning(gate, conditioning_inputs)
+    filter_ = add_conditioning(filter_, conditioning_inputs)
+    gate = add_conditioning(gate, conditioning_inputs)
 
     return tf.sigmoid(gate) * tf.tanh(filter_)
 
@@ -41,10 +41,9 @@ def model(features, labels, mode):
     )
     encoded = tf.reshape(encoded, [-1, 2047, 256])
 
-    output = encoded
-    # output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=10)
+    output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=10)
 
-    for i in range(10):
+    for i in range(5):
         output = layer(output, conv, conditioning, mode)
 
     flatten = tf.layers.flatten(output)
