@@ -7,7 +7,7 @@ import numpy as np
 from os import walk
 import tensorflow as tf
 
-from utils import conv_size
+from utils import conv_size, normalise_to_int_range
 
 
 def save_array(x, filename):
@@ -53,6 +53,10 @@ def list_input_files():
     return glob.glob('cache/samples/**/*.npy', recursive=True)
 
 
+def quantise(x):
+    return normalise_to_int_range(x, np.uint8).astype(np.int32)
+
+
 def concat_raw_from_files(file_list, channels):
     all_data = np.zeros((0, 1), np.float32)
     for file in file_list:
@@ -88,13 +92,14 @@ def create_samples(waveform, slice_size, stride):
     n_samples = (waveform.shape[0] - slice_size) // stride + 1
     # guard against waveform being too small to make a sample
     n_samples = max(n_samples, 0)
-    samples = np.empty((n_samples, slice_size, channels))
+    samples = np.empty((n_samples, slice_size, channels), waveform.dtype)
     for i in range(n_samples):
         begin = i * stride
         end = begin + slice_size
         assert (end <= waveform.shape[0])
         slice_ = waveform[begin:end]
         samples[i, :, :] = slice_
+    assert samples.dtype == np.int32
     return samples
 
 
@@ -105,8 +110,8 @@ def main():
     samples_per_second = config_dict['audio']['sample_rate']
     n_mels = 128
     i = 0
-    all_x = np.empty((0, slice_size, channels), dtype=np.float32)
-    all_y = np.empty((0, n_mels), dtype=np.uint8)
+    all_x = np.empty((0, slice_size, channels), dtype=np.int32)
+    all_y = np.empty((0, n_mels), dtype=np.float32)
 
     input_files = list_input_files()
     # for k, v in input_files.items():
@@ -119,8 +124,8 @@ def main():
         all_data_for_cat = concat_raw_from_files([v], channels)
         seconds = all_data_for_cat.shape[0] / samples_per_second
 
-        cat_x = np.empty((0, slice_size, channels), dtype=np.float32)
-        cat_y = np.empty((0, n_mels), dtype=np.uint8)
+        cat_x = np.empty((0, slice_size, channels), dtype=np.int32)
+        cat_y = np.empty((0, n_mels), dtype=np.float32)
         preprocessing_batch_size = 400000
         for j in range(i, all_data_for_cat.shape[0],
                        preprocessing_batch_size):
@@ -132,19 +137,23 @@ def main():
                        :waveform.shape[0] - waveform.shape[0] % slice_size, :]
             if waveform.shape[0] == 0:
                 continue
-            samples = create_samples(waveform, slice_size, stride)
             y = compute_features(waveform, samples_per_second, slice_size,
                                  stride, n_mels)
+            waveform = quantise(waveform)
+            samples = create_samples(waveform, slice_size, stride)
 
             assert samples.shape[0] == y.shape[0]
 
             cat_x = np.concatenate((cat_x, samples), axis=0)
             cat_y = np.concatenate((cat_y, y), axis=0)
+            assert cat_x.dtype == np.int32
 
         all_x = np.concatenate((all_x, cat_x), axis=0)
         all_y = np.concatenate((all_y, cat_y), axis=0)
         print(f'{i} {v}: {seconds:0.2f}s {cat_x.shape[0]} samples')
         i += 1
+
+        assert all_x.dtype == np.int32
 
     n_samples = all_x.shape[0]
     indices = np.arange(0, n_samples)

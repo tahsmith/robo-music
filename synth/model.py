@@ -35,9 +35,16 @@ def model(features, labels, mode):
     waveform = features['waveform']
     conditioning = features['conditioning']
 
-    output = waveform
+    encoded = tf.one_hot(
+        waveform,
+        256,
+    )
+    encoded = tf.reshape(encoded, [-1, 2047, 256])
 
-    for i in range(5):
+    output = encoded
+    # output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=10)
+
+    for i in range(10):
         output = layer(output, conv, conditioning, mode)
 
     flatten = tf.layers.flatten(output)
@@ -46,7 +53,8 @@ def model(features, labels, mode):
     logits = tf.layers.dense(dropout, 256)
     predictions = tf.argmax(logits, axis=1)
 
-    loss = tf.reduce_sum(tf.square(output - labels))
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels,
+                                                  logits=logits)
 
     training_op = tf.train.AdamOptimizer().minimize(loss,
                                                     tf.train.get_global_step())
@@ -54,14 +62,18 @@ def model(features, labels, mode):
     if mode == tf.estimator.ModeKeys.TRAIN:
         return tf.estimator.EstimatorSpec(
             mode,
-            output,
+            predictions,
             loss,
             training_op
         )
 
+    eval_metric_ops = {
+        'accuracy': tf.metrics.accuracy(labels, predictions)
+    }
+
     return tf.estimator.EstimatorSpec(
         mode,
-        output,
+        predictions,
         loss,
-        tf.metrics.accuracy(labels, output)
+        eval_metric_ops=eval_metric_ops
     )
