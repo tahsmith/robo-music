@@ -2,7 +2,7 @@ import datetime
 import tensorflow as tf
 import numpy as np
 
-from .model import model
+from .model import model_fn
 from train_utils import train_and_test
 
 
@@ -53,7 +53,6 @@ def main():
     model_dir = config_dict['data']['logs'] \
                 + f'/synth/{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
 
-    model_fn = model
     # model_fn = baseline_model(128, 256, model_dir)
 
     estimator = tf.estimator.Estimator(
@@ -86,7 +85,7 @@ def main():
 
     train_and_test(
         estimator,
-        20000,
+        100000,
         1000,
         train_input_fn,
         test_input_fn,

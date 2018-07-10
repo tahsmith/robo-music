@@ -1,11 +1,6 @@
 import math
 
-import io
-from shutil import which
 import numpy as np
-import subprocess
-
-FFMPEG_PATH = which('ffmpeg')
 
 
 def conv_size(input_width, filter_width, stride, padding):
@@ -55,3 +50,10 @@ def normalise_to_int_range(x, dtype):
     x = x * (max_int - min_int) + min_int
     x = np.rint(x).astype(dtype)
     return x
+
+
+def dilate_zero_order_hold(x, padding):
+    if len(x.shape) != 2:
+        raise NotImplementedError()
+
+    return np.tile(x, (1, padding)).reshape((x.shape[0] * padding, x.shape[1]))

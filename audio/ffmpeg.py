@@ -41,9 +41,7 @@ def load_sound_file(file_name, dtype, sample_rate, channels):
 
     error_code = ffmpeg_process.wait()
     if error_code:
-        error = subprocess.CalledProcessError(ffmpeg_process.returncode,
-                                              ffmpeg_process.args,
-                                              stderr=ffmpeg_process.stderr.read())
+        error = ValueError(ffmpeg_process.stderr.read())
         raise error
 
     return waveform

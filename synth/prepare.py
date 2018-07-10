@@ -53,7 +53,9 @@ def list_input_files():
     return glob.glob('cache/samples/**/*.npy', recursive=True)
 
 
-def quantise(x):
+def quantise(x, quantisation):
+    if quantisation != 256:
+        raise NotImplementedError('quantisation != 256')
     return normalise_to_int_range(x, np.uint8).astype(np.int32)
 
 
@@ -103,12 +105,20 @@ def create_samples(waveform, slice_size, stride):
     return samples
 
 
+def clip_to_slice_size(slice_size, waveform):
+    waveform = waveform[
+               :waveform.shape[0] - waveform.shape[0] % slice_size, :]
+    return waveform
+
+
 def main():
     from config import config_dict
     slice_size = config_dict['synth']['slice_size']
+    quantisation = config_dict['synth']['quantisation']
     channels = config_dict['audio']['channels']
     samples_per_second = config_dict['audio']['sample_rate']
-    n_mels = 128
+    n_mels = config_dict['classifier']['n_mels']
+
     i = 0
     all_x = np.empty((0, slice_size, channels), dtype=np.int32)
     all_y = np.empty((0, n_mels), dtype=np.float32)
@@ -133,13 +143,12 @@ def main():
             end = min(j + preprocessing_batch_size,
                       all_data_for_cat.shape[0])
             waveform = all_data_for_cat[begin:end]
-            waveform = waveform[
-                       :waveform.shape[0] - waveform.shape[0] % slice_size, :]
+            waveform = clip_to_slice_size(slice_size, waveform)
             if waveform.shape[0] == 0:
                 continue
             y = compute_features(waveform, samples_per_second, slice_size,
                                  stride, n_mels)
-            waveform = quantise(waveform)
+            waveform = quantise(waveform, quantisation)
             samples = create_samples(waveform, slice_size, stride)
 
             assert samples.shape[0] == y.shape[0]
