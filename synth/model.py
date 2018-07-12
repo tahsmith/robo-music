@@ -1,3 +1,5 @@
+from functools import partial
+
 import tensorflow as tf
 
 
@@ -23,9 +25,9 @@ def layer(inputs, conv_fn, conditioning_inputs, mode):
     return tf.sigmoid(gate) * tf.tanh(filter_)
 
 
-def conv(inputs):
+def conv1d(inputs, filters):
     return tf.layers.conv1d(inputs,
-                            filters=32,
+                            filters=filters,
                             kernel_size=2,
                             strides=2,
                             padding='valid')
@@ -35,8 +37,10 @@ def params_from_config():
     from config import config_dict
     synth_config = config_dict['synth']
     return {
+        'filters': synth_config['filters'],
         'quantisation': synth_config['quantisation'],
-        'regularisation': synth_config['regularisation']
+        'regularisation': synth_config['regularisation'],
+        'dropout': synth_config['dropout']
     }
 
 
@@ -44,8 +48,11 @@ def model_fn(features, labels, mode, params):
     with tf.variable_scope('synth'):
         waveform = features['waveform']
         conditioning = features['conditioning']
+
+        filters = params['filters']
         quantisation = params['quantisation']
         regularisation = params['regularisation']
+        dropout = params['dropout']
 
         encoded = tf.one_hot(
             waveform,
@@ -53,15 +60,22 @@ def model_fn(features, labels, mode, params):
         )
         encoded = tf.reshape(encoded, [-1, 2047, quantisation])
 
-        output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=32)
+        output = tf.layers.conv1d(encoded, kernel_size=2, strides=1,
+                                  filters=filters)
+
+        conv = partial(conv1d, filters=filters)
 
         for i in range(5):
             output = layer(output, conv, conditioning, mode)
+            if dropout:
+                output = tf.layers.dropout(
+                    output,
+                    rate=dropout,
+                    training=mode == tf.estimator.ModeKeys.TRAIN
+                )
 
         flatten = tf.layers.flatten(output)
-        dropout = tf.layers.dropout(flatten,
-                                    training=mode == tf.estimator.ModeKeys.TRAIN)
-        logits = tf.layers.dense(dropout, quantisation)
+        logits = tf.layers.dense(flatten, quantisation)
         predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
 
         if mode == tf.estimator.ModeKeys.PREDICT:

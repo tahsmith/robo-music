@@ -16,4 +16,6 @@ synth:
   batch_size: 1000
   steps: 10000
   steps_per_eval: 1000
-  regularisation: 0.1
+  regularisation: 0.0
+  dropout: 0.5
+  filters: 16
