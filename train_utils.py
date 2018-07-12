@@ -9,4 +9,4 @@ def train_and_test(estimator: tf.estimator.Estimator, steps, steps_between_evals
             input_fn=train_input_fn,
             steps=steps_between_evals,
         )
-        estimator.evaluate(input_fn=test_input_fn, steps=1)
+        estimator.evaluate(input_fn=test_input_fn)

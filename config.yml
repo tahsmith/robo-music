@@ -13,5 +13,7 @@ classifier:
 synth:
   slice_size: 2048
   quantisation: 256
-  batch_size: 100
-  epoch_count: 1
+  batch_size: 1000
+  steps: 10000
+  steps_per_eval: 1000
+  regularisation: 0.1

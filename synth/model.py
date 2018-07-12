@@ -33,8 +33,10 @@ def conv(inputs):
 
 def params_from_config():
     from config import config_dict
+    synth_config = config_dict['synth']
     return {
-        'quantisation': config_dict['synth']['quantisation']
+        'quantisation': synth_config['quantisation'],
+        'regularisation': synth_config['regularisation']
     }
 
 
@@ -43,6 +45,7 @@ def model_fn(features, labels, mode, params):
         waveform = features['waveform']
         conditioning = features['conditioning']
         quantisation = params['quantisation']
+        regularisation = params['regularisation']
 
         encoded = tf.one_hot(
             waveform,
@@ -64,12 +67,20 @@ def model_fn(features, labels, mode, params):
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode, predictions,
-                export_outputs={'predict_output': tf.estimator.export.PredictOutput(
-                    {"predictions": predictions,
-                     'probabilities': tf.nn.softmax(logits)})})
+                export_outputs={
+                    'predict_output': tf.estimator.export.PredictOutput(
+                        {"predictions": predictions,
+                         'probabilities': tf.nn.softmax(logits)})})
 
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels,
                                                       logits=logits)
+
+        if regularisation:
+            trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                               'synth')
+
+            reg_loss = tf.add_n([tf.nn.l2_loss(x) for x in trainable_vars])
+            loss += regularisation * reg_loss
 
         training_op = tf.train.AdamOptimizer().minimize(loss,
                                                         tf.train.get_global_step())

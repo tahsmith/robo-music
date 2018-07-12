@@ -51,7 +51,10 @@ def baseline_model(conditioning_features, quantisation, model_dir):
 def main():
     from config import config_dict
 
-    model_dir = config_dict['data']['logs'] \
+    data_config = config_dict['data']
+    synth_config = config_dict['synth']
+
+    model_dir = data_config['logs'] \
                 + f'/synth/{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
 
     # model_fn = baseline_model(128, 256, model_dir)
@@ -65,16 +68,14 @@ def main():
     (features_train, y_train), (features_test, y_test) = load_data(
         config_dict['data']['cache'])
 
-    epochs = 200
-    batch_size = 1000
-    print(f'steps: {y_train.shape[0] * epochs // batch_size}')
+    batch_size = synth_config['batch_size']
 
     train_input_fn = tf.estimator.inputs.numpy_input_fn(
         features_train,
         y_train,
         shuffle=True,
         batch_size=batch_size,
-        num_epochs=epochs,
+        num_epochs=None,
     )
 
     test_input_fn = tf.estimator.inputs.numpy_input_fn(
@@ -87,8 +88,8 @@ def main():
 
     train_and_test(
         estimator,
-        100000,
-        1000,
+        synth_config['steps'],
+        synth_config['steps_per_eval'],
         train_input_fn,
         test_input_fn,
     )
