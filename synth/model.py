@@ -39,55 +39,56 @@ def params_from_config():
 
 
 def model_fn(features, labels, mode, params):
-    waveform = features['waveform']
-    conditioning = features['conditioning']
-    quantisation = params['quantisation']
+    with tf.variable_scope('synth'):
+        waveform = features['waveform']
+        conditioning = features['conditioning']
+        quantisation = params['quantisation']
 
-    encoded = tf.one_hot(
-        waveform,
-        quantisation,
-    )
-    encoded = tf.reshape(encoded, [-1, 2047, quantisation])
+        encoded = tf.one_hot(
+            waveform,
+            quantisation
+        )
+        encoded = tf.reshape(encoded, [-1, 2047, quantisation])
 
-    output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=32)
+        output = tf.layers.conv1d(encoded, kernel_size=2, strides=1, filters=32)
 
-    for i in range(5):
-        output = layer(output, conv, conditioning, mode)
+        for i in range(5):
+            output = layer(output, conv, conditioning, mode)
 
-    flatten = tf.layers.flatten(output)
-    dropout = tf.layers.dropout(flatten,
-                                training=mode == tf.estimator.ModeKeys.TRAIN)
-    logits = tf.layers.dense(dropout, quantisation)
-    predictions = tf.argmax(logits, axis=1)
+        flatten = tf.layers.flatten(output)
+        dropout = tf.layers.dropout(flatten,
+                                    training=mode == tf.estimator.ModeKeys.TRAIN)
+        logits = tf.layers.dense(dropout, quantisation)
+        predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
 
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        return tf.estimator.EstimatorSpec(
-            mode, predictions,
-            export_outputs={'predict_output': tf.estimator.export.PredictOutput(
-                {"predictions": predictions,
-                 'probabilities': tf.nn.softmax(logits)})})
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode, predictions,
+                export_outputs={'predict_output': tf.estimator.export.PredictOutput(
+                    {"predictions": predictions,
+                     'probabilities': tf.nn.softmax(logits)})})
 
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels,
-                                                  logits=logits)
+        loss = tf.losses.sparse_softmax_cross_entropy(labels=labels,
+                                                      logits=logits)
 
-    training_op = tf.train.AdamOptimizer().minimize(loss,
-                                                    tf.train.get_global_step())
+        training_op = tf.train.AdamOptimizer().minimize(loss,
+                                                        tf.train.get_global_step())
 
-    if mode == tf.estimator.ModeKeys.TRAIN:
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            return tf.estimator.EstimatorSpec(
+                mode,
+                predictions,
+                loss,
+                training_op
+            )
+
+        eval_metric_ops = {
+            'accuracy': tf.metrics.accuracy(labels, predictions)
+        }
+
         return tf.estimator.EstimatorSpec(
             mode,
             predictions,
             loss,
-            training_op
+            eval_metric_ops=eval_metric_ops
         )
-
-    eval_metric_ops = {
-        'accuracy': tf.metrics.accuracy(labels, predictions)
-    }
-
-    return tf.estimator.EstimatorSpec(
-        mode,
-        predictions,
-        loss,
-        eval_metric_ops=eval_metric_ops
-    )

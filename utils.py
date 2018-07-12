@@ -52,7 +52,7 @@ def normalise_to_int_range(x, dtype):
     return x
 
 
-def dilate_zero_order_hold(x, padding):
+def upsample_zero_order_hold(x, padding):
     if len(x.shape) != 2:
         raise NotImplementedError()
 

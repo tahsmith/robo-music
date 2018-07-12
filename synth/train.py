@@ -2,6 +2,7 @@ import datetime
 import tensorflow as tf
 import numpy as np
 
+from synth.model import params_from_config
 from .model import model_fn
 from train_utils import train_and_test
 
@@ -57,7 +58,8 @@ def main():
 
     estimator = tf.estimator.Estimator(
         model_fn,
-        model_dir=model_dir
+        model_dir=model_dir,
+        params=params_from_config()
     )
 
     (features_train, y_train), (features_test, y_test) = load_data(
