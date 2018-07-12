@@ -123,7 +123,7 @@ def regenerate_with_conditioning(model_path, slice_size, quantisation,
     while_op_result = sess.run(while_op)
     final_i, waveform_result = while_op_result
 
-    return waveform_result[slice_size:, :].astype(np.int16)
+    return waveform_result[slice_size - 1:, :].astype(np.int16)
 
 
 if __name__ == '__main__':
