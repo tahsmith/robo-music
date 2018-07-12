@@ -37,6 +37,7 @@ def params_from_config():
     from config import config_dict
     synth_config = config_dict['synth']
     return {
+        'layers': synth_config['layers'],
         'filters': synth_config['filters'],
         'quantisation': synth_config['quantisation'],
         'regularisation': synth_config['regularisation'],
@@ -53,6 +54,7 @@ def model_fn(features, labels, mode, params):
         quantisation = params['quantisation']
         regularisation = params['regularisation']
         dropout = params['dropout']
+        layers = params['layers']
 
         encoded = tf.one_hot(
             waveform,
@@ -65,7 +67,7 @@ def model_fn(features, labels, mode, params):
 
         conv = partial(conv1d, filters=filters)
 
-        for i in range(5):
+        for i in range(layers):
             output = layer(output, conv, conditioning, mode)
             if dropout:
                 output = tf.layers.dropout(

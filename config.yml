@@ -18,4 +18,5 @@ synth:
   steps_per_eval: 1000
   regularisation: 0.0
   dropout: 0.5
+  layers: 5
   filters: 16
