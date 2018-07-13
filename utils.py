@@ -46,7 +46,7 @@ def normalise_to_int_range(x, dtype):
     max_val = np.max(x)
     min_val = np.min(x)
 
-    x = (x - min_val) / (max_val - min_val)
+    x = (x - min_val) / float(max_val - min_val)
     x = x * (max_int - min_int) + min_int
     x = np.rint(x).astype(dtype)
     return x

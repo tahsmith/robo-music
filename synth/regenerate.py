@@ -6,7 +6,7 @@ import tensorflow as tf
 from audio import ffmpeg
 from synth.prepare import compute_features, clip_to_slice_size
 from synth.model import model_fn, params_from_config
-from utils import upsample_zero_order_hold
+from utils import upsample_zero_order_hold, normalise_to_int_range
 
 
 def main(argv):
@@ -27,16 +27,15 @@ def main(argv):
 
 def regenerate(model_path, conditioning_file_path, output_path, n_mels,
                channels, quantisation, sample_rate, slice_size):
-    conditioning = load_conditioning(channels, conditioning_file_path,
+    waveform, conditioning = load_conditioning(channels, conditioning_file_path,
                                      n_mels, sample_rate, slice_size)
 
     def loop_hook(i, total):
         if i % slice_size == 0:
             print(f'{i} / {total}')
 
-    waveform = regenerate_with_conditioning(model_path, slice_size,
-                                            quantisation,
-                                            conditioning, loop_hook)
+    waveform = regenerate_with_conditioning(model_path, waveform, quantisation,
+                                            conditioning, loop_hook, slice_size)
 
     # assert conditioning.shape[0] == waveform.shape[0]
     print(conditioning.shape[0])
@@ -65,21 +64,16 @@ def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
     )
 
     conditioning = upsample_zero_order_hold(conditioning, slice_size)
+    conditioning += np.random.randn(*conditioning.shape)
 
     assert conditioning.shape[0] == conditioning_waveform.shape[0]
 
-    return conditioning
+    return conditioning_waveform, conditioning
 
 
-def regenerate_with_conditioning(model_path, slice_size, quantisation,
-                                 conditioning,
-                                 loop_hook):
-    init_waveform = np.random.randint(
-        0, 1, (slice_size - 1, 1), dtype=np.int32) * \
-                    (quantisation // 2)
-    init_waveform[slice_size - 2] = np.random.randint(0, quantisation - 1)
-
-    waveform = tf.Variable(init_waveform, dtype=tf.int32)
+def regenerate_with_conditioning(model_path, init_waveform, quantisation,
+                                 conditioning, loop_hook, slice_size):
+    waveform = tf.Variable(init_waveform[:slice_size-1, :], dtype=tf.int32)
     conditioning_tf = tf.Variable(conditioning, dtype=tf.float32)
 
     def cond(i, _):
@@ -101,7 +95,7 @@ def regenerate_with_conditioning(model_path, slice_size, quantisation,
             axis=0
         )
 
-        waveform_ = tf.Print(waveform_, [i])
+        waveform_ = tf.Print(waveform_, [i, next_point])
 
         return [tf.add(i, 1), waveform_]
 
@@ -109,7 +103,8 @@ def regenerate_with_conditioning(model_path, slice_size, quantisation,
         cond,
         loop,
         loop_vars=[0, waveform],
-        shape_invariants=[tf.TensorShape(()), tf.TensorShape([None, 1])]
+        shape_invariants=[tf.TensorShape(()), tf.TensorShape([None, 1])],
+        parallel_iterations=1
     )
 
     # assert len(graphs) == 1
@@ -117,13 +112,19 @@ def regenerate_with_conditioning(model_path, slice_size, quantisation,
     sess = tf.Session()
     new_saver = tf.train.Saver(var_list=tf.get_collection(
         tf.GraphKeys.GLOBAL_VARIABLES, 'synth'))
-    new_saver.restore(sess, tf.train.latest_checkpoint(model_path))
     sess.run(tf.global_variables_initializer())
+    new_saver.restore(sess, tf.train.latest_checkpoint(model_path))
 
     while_op_result = sess.run(while_op)
     final_i, waveform_result = while_op_result
 
-    return waveform_result[slice_size - 1:, :].astype(np.int16)
+    waveform_result = waveform_result[slice_size - 1:, :]
+    waveform_result = normalise_to_int_range(waveform_result, np.int16)
+    print(np.max(waveform_result))
+    print(np.min(waveform_result))
+    print(np.mean(waveform_result))
+
+    return waveform_result
 
 
 if __name__ == '__main__':
