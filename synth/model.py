@@ -19,8 +19,9 @@ def layer(inputs, conv_fn, conditioning_inputs, mode):
     filter_ = conv_fn(inputs)
     gate = conv_fn(inputs)
 
-    filter_ = add_conditioning(filter_, conditioning_inputs)
-    gate = add_conditioning(gate, conditioning_inputs)
+    if conditioning_inputs is not None:
+        filter_ = add_conditioning(filter_, conditioning_inputs)
+        gate = add_conditioning(gate, conditioning_inputs)
 
     return tf.sigmoid(gate) * tf.tanh(filter_)
 
@@ -41,14 +42,18 @@ def params_from_config():
         'filters': synth_config['filters'],
         'quantisation': synth_config['quantisation'],
         'regularisation': synth_config['regularisation'],
-        'dropout': synth_config['dropout']
+        'dropout': synth_config['dropout'],
+        'conditioning': synth_config['conditioning']
     }
 
 
 def model_fn(features, labels, mode, params):
     with tf.variable_scope('synth'):
         waveform = features['waveform']
-        conditioning = features['conditioning']
+        if params['conditioning']:
+            conditioning = features['conditioning']
+        else:
+            conditioning = None
 
         filters = params['filters']
         quantisation = params['quantisation']

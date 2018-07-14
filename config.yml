@@ -14,9 +14,10 @@ synth:
   slice_size: 2048
   quantisation: 256
   batch_size: 1000
-  steps: 100000
+  steps: 10000
   steps_per_eval: 1000
+  conditioning: false
   regularisation: 0.0
-  dropout: 0.5
+  dropout: 0.0
   layers: 8
   filters: 24

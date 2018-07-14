@@ -1,56 +1,19 @@
 import glob
 import os
-from itertools import product
 
 import librosa
 import numpy as np
-from os import walk
-import tensorflow as tf
 
-from utils import conv_size, normalise_to_int_range
+from utils import normalise_to_int_range
 
 
 def save_array(x, filename):
     np.save(filename, x, allow_pickle=False)
 
 
-def make_batch(all_data, start, size, timeslice_size):
-    indices = np.arange(start, size).reshape((size, 1))
-    indices = indices + np.arange(0, timeslice_size)
-    return all_data[indices.astype(np.int32)]
-
-
-def generate_slice_set(chunks, stride, slice_size):
-    chunk_size = chunks.shape[1]
-    chunk_count = chunks.shape[0]
-    slice_per_chunk = conv_size(chunk_size, slice_size, stride, 'VALID')
-
-    chunk_indices = list(range(chunk_count))
-    slice_indices = list(range(slice_per_chunk))
-    indices = product(chunk_indices, slice_indices)
-
-    for i_chunk, i_slice in indices:
-        begin = i_slice * stride
-        end = begin + slice_size
-        if end <= chunk_size:
-            yield chunks[i_chunk, begin:end, :]
-
-
-def list_categories():
-    category_names = []
-    root = './data/samples'
-    for root, dirs, files in walk(root):
-        for dir_ in dirs:
-            if dir_[0] != '_':
-                category_names.append(dir_)
-        if root != root:
-            break
-
-    return category_names
-
-
-def list_input_files():
-    return glob.glob('cache/samples/**/*.npy', recursive=True)
+def list_input_files(cache_dir):
+    return glob.glob(f'{cache_dir}/samples/**/*.npy', recursive=True) \
+           + glob.glob(f'{cache_dir}/music/**/*.npy')
 
 
 def quantise(x, quantisation):
@@ -59,23 +22,12 @@ def quantise(x, quantisation):
     return normalise_to_int_range(x, np.uint8).astype(np.int32)
 
 
-def concat_raw_from_files(file_list, channels):
-    all_data = np.zeros((0, 1), np.float32)
-    for file in file_list:
-        waveform = np.load(file)
-        waveform = np.array(waveform, dtype=np.float32)
-        waveform = np.reshape(waveform, (-1, channels))
-        waveform = (waveform - np.mean(waveform)) / np.std(waveform)
-        all_data = np.concatenate((all_data, waveform), axis=0)
-    return all_data
-
-
 def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
     if waveform.shape[1] == 1:
         waveform = waveform.reshape((-1))
 
     spec = np.abs(librosa.stft(waveform, n_fft=slice_size, hop_length=stride,
-                  center=False)) ** 2
+                               center=False)) ** 2
 
     spec = librosa.feature.melspectrogram(
         waveform,
@@ -84,9 +36,39 @@ def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
         n_mels=n_mels
     )
 
+    spec = librosa.power_to_db(spec)
+
     spec = spec.transpose((1, 0)).astype(np.float32)
 
     return spec
+
+
+def augment_samples(sample):
+    sample = sample.astype(np.float32)
+    scale = np.exp(np.random.randn(sample.shape[0], 1, 1))
+    noise = np.random.randn(*sample.shape) * 0.1
+
+    sample *= scale
+    sample += noise
+
+    return sample
+
+
+def augment_data_set(waveform, conditioning, times=2):
+    augmented_waveform = waveform
+    augmented_conditioning = conditioning
+    for i in range(times):
+        augmented_waveform = np.concatenate([
+            augmented_waveform,
+            augment_samples(waveform)
+        ], axis=0)
+
+        augmented_conditioning = np.concatenate([
+            augmented_conditioning,
+            conditioning
+        ], axis=0)
+
+    return augmented_waveform, augmented_conditioning
 
 
 def create_samples(waveform, slice_size, stride):
@@ -101,68 +83,125 @@ def create_samples(waveform, slice_size, stride):
         assert (end <= waveform.shape[0])
         slice_ = waveform[begin:end]
         samples[i, :, :] = slice_
-    assert samples.dtype == np.int32
     return samples
 
 
 def clip_to_slice_size(slice_size, waveform):
-    waveform = waveform[
-               :waveform.shape[0] - waveform.shape[0] % slice_size, :]
+    remainder = waveform.shape[0] % slice_size
+    if remainder != 0:
+        waveform = waveform[:waveform.shape[0] - remainder, :]
     return waveform
+
+
+def pad_waveform(waveform, padding, channels):
+    left_pad = padding // 2
+    right_pad = padding // 2 + padding % 2
+
+    return np.concatenate([
+        np.zeros((left_pad, channels), dtype=np.float32),
+        waveform,
+        np.zeros((right_pad, channels), dtype=np.float32)
+    ])
+
+
+def normalise_waveform(waveform, channels):
+    waveform = np.array(waveform, dtype=np.float32)
+    waveform = np.reshape(waveform, (-1, channels))
+    waveform = (waveform - np.mean(waveform)) / np.std(waveform)
+    return waveform
+
+
+def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
+    chunk = np.zeros((0, channels))
+    file_list = iter(enumerate(file_list))
+    i = -1
+    current_file_data = np.zeros((0, channels))
+    while True:
+        try:
+            if current_file_data.shape[0] == 0:
+                i, file = next(file_list)
+                current_file_data = np.load(file)
+                current_file_data = normalise_waveform(current_file_data,
+                                                       channels)
+                current_file_data = pad_waveform(current_file_data, slice_size,
+                                                 channels)
+
+            remaining_space = chunk_size - chunk.shape[0]
+            if remaining_space > 0:
+                cut = min(current_file_data.shape[0], remaining_space)
+                chunk = np.concatenate([
+                    chunk,
+                    current_file_data[:cut, :]
+                ])
+                current_file_data = current_file_data[cut:, :]
+            else:
+                yield i, chunk
+                chunk = np.zeros((0, channels))
+        except StopIteration:
+            yield i, chunk
+            break
+
+
+def waveform_chunks_to_samples(waveform_chunks, sample_rate, slice_size,
+                               stride, n_mels, quantisation):
+    for waveform in waveform_chunks:
+        features = compute_features(waveform, sample_rate, slice_size,
+                                    stride, n_mels)
+
+        # last slice may not be chunck sized
+        waveform = clip_to_slice_size(slice_size, waveform)
+        samples = create_samples(waveform, slice_size, stride)
+        samples, features = augment_data_set(samples, features, 2)
+        samples = quantise(samples, quantisation)
+
+        yield samples, features
 
 
 def main():
     from config import config_dict
-    slice_size = config_dict['synth']['slice_size']
-    quantisation = config_dict['synth']['quantisation']
-    channels = config_dict['audio']['channels']
-    samples_per_second = config_dict['audio']['sample_rate']
-    n_mels = config_dict['classifier']['n_mels']
+    synth_config = config_dict['synth']
+    audio_config = config_dict['audio']
+    data_config = config_dict['data']
 
-    i = 0
+    slice_size = synth_config['slice_size']
+    quantisation = synth_config['quantisation']
+    channels = audio_config['channels']
+    sample_rate = audio_config['sample_rate']
+    n_mels = config_dict['classifier']['n_mels']
+    samples_per_slice = 32
+
     all_x = np.empty((0, slice_size, channels), dtype=np.int32)
     all_y = np.empty((0, n_mels), dtype=np.float32)
 
-    input_files = list_input_files()
-    # for k, v in input_files.items():
-    #     print(f'{k}: {len(v)}')
+    input_files = list_input_files(data_config['cache'])
 
     # number of data points generated per slice.
-    stride = slice_size // 8
+    stride = slice_size // samples_per_slice
+    chunck_size = 400000
+    chunck_size = chunck_size - chunck_size % slice_size
+    generate_waveforms = lambda: files_to_waveform_chunks(
+        input_files,
+        channels,
+        chunck_size,
+        slice_size
+    )
 
-    for v in input_files:
-        all_data_for_cat = concat_raw_from_files([v], channels)
-        seconds = all_data_for_cat.shape[0] / samples_per_second
+    def log_progress(i, x):
+        print(f'file {i} / {len(input_files)}: {input_files[i]}')
+        return x
 
-        cat_x = np.empty((0, slice_size, channels), dtype=np.int32)
-        cat_y = np.empty((0, n_mels), dtype=np.float32)
-        preprocessing_batch_size = 400000
-        for j in range(i, all_data_for_cat.shape[0],
-                       preprocessing_batch_size):
-            begin = j
-            end = min(j + preprocessing_batch_size,
-                      all_data_for_cat.shape[0])
-            waveform = all_data_for_cat[begin:end]
-            waveform = clip_to_slice_size(slice_size, waveform)
-            if waveform.shape[0] == 0:
-                continue
-            y = compute_features(waveform, samples_per_second, slice_size,
-                                 stride, n_mels)
-            waveform = quantise(waveform, quantisation)
-            samples = create_samples(waveform, slice_size, stride)
+    generate_samples = lambda: waveform_chunks_to_samples(
+        (log_progress(i, x) for i, x in generate_waveforms()),
+        sample_rate,
+        slice_size,
+        stride,
+        n_mels,
+        quantisation
+    )
 
-            assert samples.shape[0] == y.shape[0]
-
-            cat_x = np.concatenate((cat_x, samples), axis=0)
-            cat_y = np.concatenate((cat_y, y), axis=0)
-            assert cat_x.dtype == np.int32
-
-        all_x = np.concatenate((all_x, cat_x), axis=0)
-        all_y = np.concatenate((all_y, cat_y), axis=0)
-        print(f'{i} {v}: {seconds:0.2f}s {cat_x.shape[0]} samples')
-        i += 1
-
-        assert all_x.dtype == np.int32
+    for samples, features in generate_samples():
+        all_x = np.concatenate([all_x, samples])
+        all_y = np.concatenate([all_y, features])
 
     n_samples = all_x.shape[0]
     indices = np.arange(0, n_samples)
