@@ -143,7 +143,7 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
 
 
 def waveform_chunks_to_samples(waveform_chunks, sample_rate, slice_size,
-                               stride, n_mels, quantisation):
+                               stride, n_mels, quantisation, augmentation):
     for waveform in waveform_chunks:
         features = compute_features(waveform, sample_rate, slice_size,
                                     stride, n_mels)
@@ -151,7 +151,7 @@ def waveform_chunks_to_samples(waveform_chunks, sample_rate, slice_size,
         # last slice may not be chunck sized
         waveform = clip_to_slice_size(slice_size, waveform)
         samples = create_samples(waveform, slice_size, stride)
-        samples, features = augment_data_set(samples, features, 2)
+        samples, features = augment_data_set(samples, features, augmentation)
         samples = quantise(samples, quantisation)
 
         yield samples, features
@@ -168,15 +168,14 @@ def main():
     channels = audio_config['channels']
     sample_rate = audio_config['sample_rate']
     n_mels = config_dict['classifier']['n_mels']
-    samples_per_slice = 32
+    stride = synth_config['sample_stride']
+    augmentation = synth_config['sample_augmentation']
 
     all_x = np.empty((0, slice_size, channels), dtype=np.int32)
     all_y = np.empty((0, n_mels), dtype=np.float32)
 
     input_files = list_input_files(data_config['cache'])
 
-    # number of data points generated per slice.
-    stride = slice_size // samples_per_slice
     chunck_size = 400000
     chunck_size = chunck_size - chunck_size % slice_size
     generate_waveforms = lambda: files_to_waveform_chunks(
@@ -196,7 +195,8 @@ def main():
         slice_size,
         stride,
         n_mels,
-        quantisation
+        quantisation,
+        augmentation
     )
 
     for samples, features in generate_samples():
