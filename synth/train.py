@@ -73,12 +73,13 @@ def input_generator(waveform_files, feature_files, batch_size):
             )
 
 
-def input_function_from_file(waveform_files, feature_files, batch_size):
+def input_function_from_file(waveform_files, feature_files, batch_size,
+                             prefetch):
     def input_fn():
         return tf.data.Dataset.from_generator(
             partial(input_generator, waveform_files, feature_files, batch_size),
             ({'waveform': tf.int32, 'conditioning': tf.float32}, tf.int32)
-        )
+        ).prefetch(prefetch)
 
     return input_fn
 
@@ -113,23 +114,26 @@ def main(argv):
 
     n_files = len(waveform_files)
     train_cut = 90 * n_files // 100
+    steps_per_evals = synth_config['steps_per_eval']
 
     train_input_fn = input_function_from_file(
         waveform_files[:train_cut],
         feature_files[:train_cut],
-        batch_size
+        batch_size,
+        steps_per_evals
     )
 
     test_input_fn = input_function_from_file(
         waveform_files[train_cut:],
         feature_files[train_cut:],
-        batch_size
+        batch_size,
+        1
     )
 
     train_and_test(
         estimator,
         synth_config['steps'],
-        synth_config['steps_per_eval'],
+        steps_per_evals,
         train_input_fn,
         test_input_fn,
     )
