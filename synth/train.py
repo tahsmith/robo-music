@@ -3,6 +3,7 @@ import glob
 
 import sys
 from functools import partial
+from random import shuffle
 
 import tensorflow as tf
 import numpy as np
@@ -54,7 +55,9 @@ def baseline_model(conditioning_features, quantisation, model_dir):
 
 
 def input_generator(waveform_files, feature_files):
-    for waveform_file, feature_file in zip(waveform_files, feature_files):
+    pairs = list(zip(waveform_files, feature_files))
+    shuffle(pairs)
+    for waveform_file, feature_file in pairs:
         waveform, label = load_batch(waveform_file)
         features = np.load(feature_file)
 
@@ -80,7 +83,6 @@ def main(argv):
 
     data_config = config_dict['data']
     synth_config = config_dict['synth']
-    audio_config = config_dict['audio']
 
     try:
         model_dir = argv[1]

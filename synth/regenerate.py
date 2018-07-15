@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from audio import ffmpeg
-from synth.prepare import compute_features, clip_to_slice_size
+from synth.prepare import compute_features, clip_to_slice_size, normalise_waveform
 from synth.model import model_fn, params_from_config
 from utils import upsample_zero_order_hold, normalise_to_int_range
 
@@ -55,6 +55,9 @@ def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
 
     conditioning_waveform = clip_to_slice_size(slice_size,
                                                conditioning_waveform)
+
+    conditioning_waveform = normalise_waveform(conditioning_waveform, channels)
+
     conditioning = compute_features(
         conditioning_waveform,
         sample_rate,

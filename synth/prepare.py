@@ -208,14 +208,14 @@ def main():
     input_files = list_input_files(data_config['cache'])
     shuffle(input_files)
 
-    chunck_size = 400000  # this value comes from librosa.stft
-    chunck_size = chunck_size - chunck_size % slice_size
+    chunk_size = 400000  # this value comes from librosa.stft
+    chunk_size = chunk_size - chunk_size % slice_size
 
     def generate_waveforms():
         return files_to_waveform_chunks(
             input_files,
             channels,
-            chunck_size,
+            chunk_size,
             slice_size
         )
 
