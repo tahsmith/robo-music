@@ -1,5 +1,9 @@
 import glob
 import os
+from multiprocessing import Pool
+from random import shuffle
+
+from numpy import random
 
 import librosa
 import numpy as np
@@ -138,23 +142,53 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
                 yield i, chunk
                 chunk = np.zeros((0, channels))
         except StopIteration:
-            yield i, chunk
+            # yield i, chunk
             break
 
 
-def waveform_chunks_to_samples(waveform_chunks, sample_rate, slice_size,
-                               stride, n_mels, quantisation, augmentation):
-    for waveform in waveform_chunks:
-        features = compute_features(waveform, sample_rate, slice_size,
-                                    stride, n_mels)
+def waveform_to_samples(waveform, sample_rate, slice_size,
+                        stride, n_mels, quantisation, augmentation):
+    features = compute_features(waveform, sample_rate, slice_size,
+                                stride, n_mels)
 
-        # last slice may not be chunck sized
-        waveform = clip_to_slice_size(slice_size, waveform)
-        samples = create_samples(waveform, slice_size, stride)
-        samples, features = augment_data_set(samples, features, augmentation)
-        samples = quantise(samples, quantisation)
+    # last slice may not be chunck sized
+    waveform = clip_to_slice_size(slice_size, waveform)
+    samples = create_samples(waveform, slice_size, stride)
+    samples, features = augment_data_set(samples, features, augmentation)
+    samples = quantise(samples, quantisation)
 
-        yield samples, features
+    return samples, features
+
+
+def file_shuffle(file_count):
+    choices = list(range(file_count))
+    choice1, choice2 = random.choice(choices, size=2, replace=False)
+    waveform1 = np.load(f'./cache/synth/waveform_{choice1}.npy')
+    waveform2 = np.load(f'./cache/synth/waveform_{choice2}.npy')
+    features1 = np.load(f'./cache/synth/features_{choice1}.npy')
+    features2 = np.load(f'./cache/synth/features_{choice2}.npy')
+
+    size = waveform1.shape[0]
+    assert waveform2.shape[0] == size
+
+    waveform_all = np.concatenate([waveform1, waveform2])
+    features_all = np.concatenate([features1, features2])
+
+    indices = np.arange(0, size * 2)
+    np.random.shuffle(indices)
+    waveform_all = waveform_all[indices, :, :]
+    features_all = features_all[indices, :]
+
+    waveform1 = waveform_all[:size, :, :]
+    features1 = features_all[:size, :]
+
+    waveform2 = waveform_all[size:, :, :]
+    features2 = features_all[size:, :]
+
+    save_array(waveform1, f'./cache/synth/waveform_{choice1}.npy')
+    save_array(waveform2, f'./cache/synth/waveform_{choice2}.npy')
+    save_array(features1, f'./cache/synth/features_{choice1}.npy')
+    save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
 def main():
@@ -171,65 +205,51 @@ def main():
     stride = synth_config['sample_stride']
     augmentation = synth_config['sample_augmentation']
 
-    all_x = np.empty((0, slice_size, channels), dtype=np.int32)
-    all_y = np.empty((0, n_mels), dtype=np.float32)
-
     input_files = list_input_files(data_config['cache'])
+    shuffle(input_files)
 
-    chunck_size = 400000
+    chunck_size = 400000  # this value comes from librosa.stft
     chunck_size = chunck_size - chunck_size % slice_size
-    generate_waveforms = lambda: files_to_waveform_chunks(
-        input_files,
-        channels,
-        chunck_size,
-        slice_size
-    )
 
-    def log_progress(i, x):
+    def generate_waveforms():
+        return files_to_waveform_chunks(
+            input_files,
+            channels,
+            chunck_size,
+            slice_size
+        )
+
+    def log_progress(tup):
+        i, x = tup
         print(f'file {i} / {len(input_files)}: {input_files[i]}')
         return x
 
-    generate_samples = lambda: waveform_chunks_to_samples(
-        (log_progress(i, x) for i, x in generate_waveforms()),
-        sample_rate,
-        slice_size,
-        stride,
-        n_mels,
-        quantisation,
-        augmentation
-    )
+    def make_batch(x):
+        return waveform_to_samples(log_progress(x), sample_rate,
+                                   slice_size, stride, n_mels,
+                                   quantisation, augmentation)
 
-    for samples, features in generate_samples():
-        all_x = np.concatenate([all_x, samples])
-        all_y = np.concatenate([all_y, features])
-
-    n_samples = all_x.shape[0]
-    indices = np.arange(0, n_samples)
-    np.random.shuffle(indices)
-    all_x = all_x[indices]
-    all_y = all_y[indices]
-
-    train_percent = 90
-    i_train = (n_samples * train_percent) // 100
-    x_train = all_x[0:i_train]
-    y_train = all_y[0:i_train]
-
-    x_test = all_x[i_train:]
-    y_test = all_y[i_train:]
-
-    print("Summary:")
-    print('features  {}'.format(n_mels))
-    print('training  {}'.format(i_train))
-    print('test:     {}'.format(n_samples - i_train))
+    samples = (make_batch(x) for x in generate_waveforms())
 
     try:
         os.mkdir('./cache/synth/')
     except FileExistsError:
         pass
-    save_array(x_test, './cache/synth/waveform_test.npy')
-    save_array(y_test, './cache/synth/features_test.npy')
-    save_array(x_train, './cache/synth/waveform_train.npy')
-    save_array(y_train, './cache/synth/features_train.npy')
+
+    n_samples = 0
+
+    for i, (samples, features) in enumerate(samples):
+        save_array(samples, f'./cache/synth/waveform_{i}.npy')
+        save_array(features, f'./cache/synth/features_{i}.npy')
+        n_samples += samples.shape[0]
+
+    print("Summary:")
+    print('features  {}'.format(n_mels))
+    print('samples   {}'.format(n_samples))
+
+    for n in range(2 * i):
+        print('shuffling')
+        file_shuffle(i)
 
 
 if __name__ == '__main__':

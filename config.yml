@@ -12,7 +12,7 @@ classifier:
 
 synth:
   sample_augmentation: 2
-  sample_stride: 32
+  sample_stride: 16
   slice_size: 2048
   quantisation: 256
   batch_size: 1000

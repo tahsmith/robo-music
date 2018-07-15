@@ -1,4 +1,9 @@
 import datetime
+import glob
+
+import sys
+from functools import partial
+
 import tensorflow as tf
 import numpy as np
 
@@ -48,14 +53,40 @@ def baseline_model(conditioning_features, quantisation, model_dir):
     ).model_fn
 
 
-def main():
+def input_generator(waveform_files, feature_files):
+    for waveform_file, feature_file in zip(waveform_files, feature_files):
+        waveform, label = load_batch(waveform_file)
+        features = np.load(feature_file)
+
+        for i in range(waveform.shape[0]):
+            yield {
+                      'waveform': waveform[i, :, :],
+                      'conditioning': features[i, :]
+                  }, label[i]
+
+
+def input_function_from_file(waveform_files, feature_files, batch_size):
+    def input_fn():
+        return tf.data.Dataset.from_generator(
+            partial(input_generator, waveform_files, feature_files),
+            ({'waveform': tf.int32, 'conditioning': tf.float32}, tf.int32)
+        ).batch(batch_size)
+
+    return input_fn
+
+
+def main(argv):
     from config import config_dict
 
     data_config = config_dict['data']
     synth_config = config_dict['synth']
+    audio_config = config_dict['audio']
 
-    model_dir = data_config['logs'] \
-                + f'/synth/{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
+    try:
+        model_dir = argv[1]
+    except IndexError:
+        model_dir = data_config['logs'] \
+                    + f'/synth/{datetime.datetime.utcnow():%Y_%m_%d_%H_%M}'
 
     # model_fn = baseline_model(128, 256, model_dir)
 
@@ -65,25 +96,27 @@ def main():
         params=params_from_config()
     )
 
-    (features_train, y_train), (features_test, y_test) = load_data(
-        config_dict['data']['cache'])
-
     batch_size = synth_config['batch_size']
 
-    train_input_fn = tf.estimator.inputs.numpy_input_fn(
-        features_train,
-        y_train,
-        shuffle=True,
-        batch_size=batch_size,
-        num_epochs=None,
+    waveform_files = glob.glob(
+        f"{config_dict['data']['cache']}/synth/waveform*.npy")
+
+    feature_files = glob.glob(
+        f"{config_dict['data']['cache']}/synth/features*.npy")
+
+    n_files = len(waveform_files)
+    train_cut = 90 * n_files // 100
+
+    train_input_fn = input_function_from_file(
+        waveform_files[:train_cut],
+        feature_files[:train_cut],
+        batch_size
     )
 
-    test_input_fn = tf.estimator.inputs.numpy_input_fn(
-        features_test,
-        y_test,
-        shuffle=True,
-        batch_size=batch_size,
-        num_epochs=1,
+    test_input_fn = input_function_from_file(
+        waveform_files[train_cut:],
+        feature_files[train_cut:],
+        batch_size
     )
 
     train_and_test(
@@ -96,4 +129,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)
