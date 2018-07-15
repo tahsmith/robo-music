@@ -20,10 +20,33 @@ def list_input_files(cache_dir):
            + glob.glob(f'{cache_dir}/music/**/*.npy')
 
 
+def mu_law_encode(audio, quantization_channels):
+    '''Quantizes waveform amplitudes.'''
+    mu = np.float32(quantization_channels - 1.0)
+    # Perform mu-law companding transformation (ITU-T, 1988).
+    # Minimum operation is here to deal with rare large amplitudes caused
+    # by resampling.
+    safe_audio_abs = np.minimum(np.abs(audio), 1.0)
+    magnitude = np.log1p(mu * safe_audio_abs) / np.log1p(mu)
+    signal = np.sign(audio) * magnitude
+    # Quantize signal to the specified number of levels.
+    return np.int32((signal + 1) / 2 * mu + 0.5)
+
+
+def mu_law_decode(output, quantization_channels):
+    '''Recovers waveform from quantized values.'''
+    mu = quantization_channels - 1
+    # Map values back to [-1, 1].
+    signal = 2 * (np.float32(output) / mu) - 1
+    # Perform inverse of mu-law transformation.
+    magnitude = (1 / mu) * ((1 + mu) ** np.abs(signal) - 1)
+    return np.sign(signal) * magnitude
+
+
 def quantise(x, quantisation):
     if quantisation != 256:
         raise NotImplementedError('quantisation != 256')
-    return normalise_to_int_range(x, np.uint8).astype(np.int32)
+    return mu_law_encode(x, quantisation)
 
 
 def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
@@ -219,13 +242,9 @@ def main():
             slice_size
         )
 
-    def log_progress(tup):
-        i, x = tup
-        print(f'file {i} / {len(input_files)}: {input_files[i]}')
-        return x
-
     def make_batch(x):
-        return waveform_to_samples(log_progress(x), sample_rate,
+        i, x = x
+        return waveform_to_samples(x, sample_rate,
                                    slice_size, stride, n_mels,
                                    quantisation, augmentation)
 
@@ -242,6 +261,7 @@ def main():
         save_array(samples, f'./cache/synth/waveform_{i}.npy')
         save_array(features, f'./cache/synth/features_{i}.npy')
         n_samples += samples.shape[0]
+        print(f'batch {i}')
 
     print("Summary:")
     print('features  {}'.format(n_mels))

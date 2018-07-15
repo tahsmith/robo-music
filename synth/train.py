@@ -54,26 +54,31 @@ def baseline_model(conditioning_features, quantisation, model_dir):
     ).model_fn
 
 
-def input_generator(waveform_files, feature_files):
+def input_generator(waveform_files, feature_files, batch_size):
     pairs = list(zip(waveform_files, feature_files))
     shuffle(pairs)
     for waveform_file, feature_file in pairs:
         waveform, label = load_batch(waveform_file)
         features = np.load(feature_file)
 
-        for i in range(waveform.shape[0]):
-            yield {
-                      'waveform': waveform[i, :, :],
-                      'conditioning': features[i, :]
-                  }, label[i]
+        for i in range(waveform.shape[0] // batch_size):
+            begin = i * batch_size
+            end = begin + batch_size
+            yield (
+                {
+                    'waveform': waveform[begin:end, :, :],
+                    'conditioning': features[begin:end, :]
+                },
+                label[begin:end]
+            )
 
 
 def input_function_from_file(waveform_files, feature_files, batch_size):
     def input_fn():
         return tf.data.Dataset.from_generator(
-            partial(input_generator, waveform_files, feature_files),
+            partial(input_generator, waveform_files, feature_files, batch_size),
             ({'waveform': tf.int32, 'conditioning': tf.float32}, tf.int32)
-        ).batch(batch_size)
+        )
 
     return input_fn
 

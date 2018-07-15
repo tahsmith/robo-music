@@ -36,8 +36,10 @@ def conv1d(inputs, filters):
 
 def params_from_config():
     from config import config_dict
+    audio_config = config_dict['audio']
     synth_config = config_dict['synth']
     return {
+        'channels': audio_config['channels'],
         'layers': synth_config['layers'],
         'filters': synth_config['filters'],
         'quantisation': synth_config['quantisation'],
@@ -55,19 +57,22 @@ def model_fn(features, labels, mode, params):
         else:
             conditioning = None
 
+        channels = params['channels']
         filters = params['filters']
         quantisation = params['quantisation']
         regularisation = params['regularisation']
         dropout = params['dropout']
         layers = params['layers']
 
-        encoded = tf.one_hot(
-            waveform,
+        assert channels == 1
+        one_hot = tf.one_hot(
+            waveform[:, :, 0],
             quantisation
         )
-        encoded = tf.reshape(encoded, [-1, 2047, quantisation])
 
-        output = tf.layers.conv1d(encoded, kernel_size=2, strides=1,
+        one_hot = tf.reshape(one_hot, [-1, 2047, quantisation])
+
+        output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
                                   filters=filters)
 
         conv = partial(conv1d, filters=filters)
