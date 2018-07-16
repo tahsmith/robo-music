@@ -34,7 +34,7 @@ def walk_dir(sample_rate, channels):
 
 def main(argv):
     from config import parse_config
-    audio_dict = parse_config('./config.yaml')['audio']
+    audio_dict = parse_config('./config.yml')['audio']
 
     walk_dir(audio_dict['sample_rate'], audio_dict['channels'])
 

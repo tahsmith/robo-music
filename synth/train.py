@@ -61,7 +61,14 @@ def input_generator(waveform_files, feature_files, batch_size):
         waveform, label = load_batch(waveform_file)
         features = np.load(feature_file)
 
-        for i in range(waveform.shape[0] // batch_size):
+        assert not np.any(np.isnan(waveform))
+        assert not np.any(np.isnan(label))
+        assert np.all(waveform <= 255)
+        assert np.all(label <= 255)
+        assert np.all(waveform >= 0)
+        assert np.all(label >= 0)
+
+        for i in range((waveform.shape[0] // batch_size) - 1):
             begin = i * batch_size
             end = begin + batch_size
             yield (

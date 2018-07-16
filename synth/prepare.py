@@ -1,14 +1,11 @@
 import glob
 import os
-from multiprocessing import Pool
 from random import shuffle
 
 from numpy import random
 
 import librosa
 import numpy as np
-
-from utils import normalise_to_int_range
 
 
 def save_array(x, filename):
@@ -17,7 +14,7 @@ def save_array(x, filename):
 
 def list_input_files(cache_dir):
     return glob.glob(f'{cache_dir}/samples/**/*.npy', recursive=True) \
-           + glob.glob(f'{cache_dir}/music/**/*.npy')
+           + glob.glob(f'{cache_dir}/music/*.npy')
 
 
 def mu_law_encode(audio, quantization_channels):
@@ -26,11 +23,8 @@ def mu_law_encode(audio, quantization_channels):
     # Perform mu-law companding transformation (ITU-T, 1988).
     # Minimum operation is here to deal with rare large amplitudes caused
     # by resampling.
-    safe_audio_abs = np.minimum(np.abs(audio), 1.0)
-    magnitude = np.log1p(mu * safe_audio_abs) / np.log1p(mu)
-    signal = np.sign(audio) * magnitude
-    # Quantize signal to the specified number of levels.
-    return np.int32((signal + 1) / 2 * mu + 0.5)
+    mu_law = np.sign(audio) * np.log1p(mu * np.abs(audio)) / np.log1p(mu)
+    return np.int32((mu_law + 1) / 2 * mu + 0.5)
 
 
 def mu_law_decode(output, quantization_channels):
@@ -70,10 +64,10 @@ def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
     return spec
 
 
-def augment_samples(sample):
+def augment_sample(sample, noise_level=0.1):
     sample = sample.astype(np.float32)
-    scale = np.exp(np.random.randn(sample.shape[0], 1, 1))
-    noise = np.random.randn(*sample.shape) * 0.1
+    scale = 2 ** np.random.uniform(-1.0, 1.0)
+    noise = np.random.randn(*sample.shape) * noise_level
 
     sample *= scale
     sample += noise
@@ -81,21 +75,15 @@ def augment_samples(sample):
     return sample
 
 
-def augment_data_set(waveform, conditioning, times=2):
+def augment(waveform, times=2):
     augmented_waveform = waveform
-    augmented_conditioning = conditioning
     for i in range(times):
         augmented_waveform = np.concatenate([
             augmented_waveform,
-            augment_samples(waveform)
+            augment_sample(waveform)
         ], axis=0)
 
-        augmented_conditioning = np.concatenate([
-            augmented_conditioning,
-            conditioning
-        ], axis=0)
-
-    return augmented_waveform, augmented_conditioning
+    return augmented_waveform
 
 
 def create_samples(waveform, slice_size, stride):
@@ -120,25 +108,32 @@ def clip_to_slice_size(slice_size, waveform):
     return waveform
 
 
-def pad_waveform(waveform, padding, channels):
+def pad_waveform(waveform, padding, channels, noise=0.1):
     left_pad = padding // 2
     right_pad = padding // 2 + padding % 2
 
     return np.concatenate([
-        np.zeros((left_pad, channels), dtype=np.float32),
+        np.random.randn(left_pad, channels) * noise,
         waveform,
-        np.zeros((right_pad, channels), dtype=np.float32)
+        np.random.randn(right_pad, channels) * noise
     ])
 
 
 def normalise_waveform(waveform, channels):
     waveform = np.array(waveform, dtype=np.float32)
     waveform = np.reshape(waveform, (-1, channels))
-    waveform = (waveform - np.mean(waveform)) / np.std(waveform)
+    waveform = waveform - np.mean(waveform)
+    waveform_range = np.max(np.abs(waveform))
+    waveform /= waveform_range
+
+    assert np.all(waveform <= 1.0)
+    assert np.all(waveform >= -1.0)
+
     return waveform
 
 
-def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
+def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
+                             augmentation):
     chunk = np.zeros((0, channels))
     file_list = iter(enumerate(file_list))
     i = -1
@@ -148,10 +143,11 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
             if current_file_data.shape[0] == 0:
                 i, file = next(file_list)
                 current_file_data = np.load(file)
-                current_file_data = normalise_waveform(current_file_data,
-                                                       channels)
                 current_file_data = pad_waveform(current_file_data, slice_size,
                                                  channels)
+                current_file_data = augment(current_file_data, augmentation)
+                current_file_data = normalise_waveform(current_file_data,
+                                                       channels)
 
             remaining_space = chunk_size - chunk.shape[0]
             if remaining_space > 0:
@@ -162,6 +158,7 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
                 ])
                 current_file_data = current_file_data[cut:, :]
             else:
+                assert chunk.shape[0] == chunk_size
                 yield i, chunk
                 chunk = np.zeros((0, channels))
         except StopIteration:
@@ -170,15 +167,17 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size):
 
 
 def waveform_to_samples(waveform, sample_rate, slice_size,
-                        stride, n_mels, quantisation, augmentation):
+                        stride, n_mels, quantisation):
     features = compute_features(waveform, sample_rate, slice_size,
                                 stride, n_mels)
 
     # last slice may not be chunck sized
     waveform = clip_to_slice_size(slice_size, waveform)
     samples = create_samples(waveform, slice_size, stride)
-    samples, features = augment_data_set(samples, features, augmentation)
     samples = quantise(samples, quantisation)
+
+    assert np.all(samples <= 255)
+    assert np.all(samples >= 0)
 
     return samples, features
 
@@ -229,9 +228,12 @@ def main():
     augmentation = synth_config['sample_augmentation']
 
     input_files = list_input_files(data_config['cache'])
+    print(f'files: {input_files}')
     shuffle(input_files)
 
-    chunk_size = 400000  # this value comes from librosa.stft
+    chunk_size = synth_config['prepare_batch_size']  # 400000 is the max. This
+    # value comes from librosa.stft
+
     chunk_size = chunk_size - chunk_size % slice_size
 
     def generate_waveforms():
@@ -239,14 +241,15 @@ def main():
             input_files,
             channels,
             chunk_size,
-            slice_size
+            slice_size,
+            augmentation
         )
 
     def make_batch(x):
         i, x = x
         return waveform_to_samples(x, sample_rate,
                                    slice_size, stride, n_mels,
-                                   quantisation, augmentation)
+                                   quantisation)
 
     samples = (make_batch(x) for x in generate_waveforms())
 
@@ -268,7 +271,7 @@ def main():
     print('samples   {}'.format(n_samples))
 
     for n in range(2 * i):
-        print('shuffling')
+        print(f'shuffling {n}')
         file_shuffle(i)
 
 

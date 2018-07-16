@@ -84,9 +84,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
 
     def loop(i, waveform_):
         features = {
-            'waveform': waveform_[tf.newaxis, -slice_size + 1:, :]
-                        + tf.random_uniform(tf.shape(waveform), 0, 256,
-                                            tf.int32),
+            'waveform': waveform_[tf.newaxis, -slice_size + 1:, :],
             'conditioning': conditioning_tf[i:i + 1, :]
         }
 
