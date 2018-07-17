@@ -83,7 +83,6 @@ def model_fn(features, labels, mode, params):
 
         for dilation in dilation_layers:
             output = layer(output, conditioning, filters, dilation, mode)
-            layers.append(output)
             if dropout:
                 output = tf.layers.dropout(
                     output,
