@@ -21,8 +21,8 @@ synth:
   steps_per_eval: 1000
   eval_steps: 100
   conditioning: false
-  regularisation: 0.0
+  regularisation: 0.001
   dropout: 0.0
   dilation_stack_depth: 9
-  dilation_stack_count: 1
+  dilation_stack_count: 2
   filters: 24

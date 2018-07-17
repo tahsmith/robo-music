@@ -13,7 +13,7 @@ def add_conditioning(inputs, conditioning):
     return output
 
 
-def layer(inputs, conditioning_inputs, filters, dilation, mode):
+def conv_layer(inputs, conditioning_inputs, filters, dilation, mode):
     with tf.name_scope('conv_layer'):
         with tf.name_scope('filter'):
             filter_ = conv1d(inputs, filters, dilation)
@@ -45,6 +45,7 @@ def params_from_config():
     audio_config = config_dict['audio']
     synth_config = config_dict['synth']
     return {
+        'slice_size': synth_config['slice_size'],
         'channels': audio_config['channels'],
         'dilation_stack_depth': synth_config['dilation_stack_depth'],
         'dilation_stack_count': synth_config['dilation_stack_count'],
@@ -64,6 +65,7 @@ def model_fn(features, labels, mode, params):
         else:
             conditioning = None
 
+        input_width = params['slice_size'] - 1
         channels = params['channels']
         filters = params['filters']
         quantisation = params['quantisation']
@@ -88,15 +90,20 @@ def model_fn(features, labels, mode, params):
             for _ in range(dilation_stack_count)
             for i in range(dilation_stack_depth)
         ]
+        layers = []
 
         for dilation in dilation_layers:
-            output = layer(output, conditioning, filters, dilation, mode)
+            output = conv_layer(output, conditioning, filters, dilation, mode)
             if dropout:
                 output = tf.layers.dropout(
                     output,
                     rate=dropout,
                     training=mode == tf.estimator.ModeKeys.TRAIN
                 )
+            layers.append(output)
+
+        output_width = input_width - sum(dilation_layers) - 1
+        output = tf.add_n([layer[:, -output_width:, :] for layer in layers])
 
         flatten = tf.layers.flatten(output)
         logits = tf.layers.dense(flatten, quantisation)
