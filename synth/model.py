@@ -6,6 +6,10 @@ def model_fn(features, labels, mode, params):
         waveform = features['waveform']
         if params['conditioning']:
             conditioning = features['conditioning']
+            conditioning = tf.reshape(conditioning, [-1, 128])
+            conditioning = tf.layers.dense(conditioning, 128)
+            conditioning = tf.reshape(conditioning, [-1, 1, 128])
+
         else:
             conditioning = None
 
@@ -100,30 +104,25 @@ def conv_layer(inputs, conditioning_inputs, filters, dilation, mode):
         with tf.name_scope('filter'):
             filter_ = conv1d(inputs, filters, dilation)
             if conditioning_inputs is not None:
-                filter_ = add_conditioning(filter_, conditioning_inputs)
+                filter_ = add_conditioning(filter_, conditioning_inputs,
+                                           filters)
 
             filter_ = tf.tanh(filter_)
 
         with tf.name_scope('gate'):
             gate = conv1d(inputs, filters, dilation)
             if conditioning_inputs is not None:
-                gate = add_conditioning(gate, conditioning_inputs)
+                gate = add_conditioning(gate, conditioning_inputs, filters)
 
             gate = tf.sigmoid(gate)
 
         return filter_ * gate + inputs[:, dilation:, :]
 
 
-def add_conditioning(inputs, conditioning):
-    conditioning_layer = tf.layers.dense(conditioning, 1)
-    shape = tf.shape(inputs)
-
-    input_flattened = tf.reshape(inputs, [shape[0], shape[1] * shape[2]])
-
-    output = conditioning_layer + input_flattened
-    output = tf.reshape(output, shape)
-
-    return output
+def add_conditioning(inputs, conditioning, filters):
+    conditioning_layer = tf.layers.dense(conditioning, filters)
+    outputs = inputs + conditioning_layer
+    return outputs
 
 
 def conv1d(inputs, filters, dilation):

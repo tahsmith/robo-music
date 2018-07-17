@@ -20,7 +20,7 @@ synth:
   steps: 100000
   steps_per_eval: 1000
   eval_steps: 100
-  conditioning: false
+  conditioning: true
   regularisation: 0.001
   dropout: 0.0
   dilation_stack_depth: 9
