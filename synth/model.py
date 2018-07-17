@@ -29,7 +29,7 @@ def layer(inputs, conditioning_inputs, filters, dilation, mode):
 
             gate = tf.sigmoid(gate)
 
-        return filter_ * gate
+        return filter_ * gate + inputs[:, dilation:, :]
 
 
 def conv1d(inputs, filters, dilation):
