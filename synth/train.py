@@ -122,6 +122,7 @@ def main(argv):
     n_files = len(waveform_files)
     train_cut = 90 * n_files // 100
     steps_per_evals = synth_config['steps_per_eval']
+    evals_steps = synth_config['eval_steps']
 
     train_input_fn = input_function_from_file(
         waveform_files[:train_cut],
@@ -134,16 +135,13 @@ def main(argv):
         waveform_files[train_cut:],
         feature_files[train_cut:],
         batch_size,
-        1
+        evals_steps
     )
 
-    train_and_test(
-        estimator,
-        synth_config['steps'],
-        steps_per_evals,
-        train_input_fn,
-        test_input_fn,
-    )
+    train_and_test(estimator, train_input_fn, test_input_fn,
+                   synth_config['steps'],
+                   steps_per_evals,
+                   evals_steps)
 
 
 if __name__ == '__main__':
