@@ -14,14 +14,22 @@ def add_conditioning(inputs, conditioning):
 
 
 def layer(inputs, conditioning_inputs, filters, dilation, mode):
-    filter_ = conv1d(inputs, filters, dilation)
-    gate = conv1d(inputs, filters, dilation)
+    with tf.name_scope('conv_layer'):
+        with tf.name_scope('filter'):
+            filter_ = conv1d(inputs, filters, dilation)
+            if conditioning_inputs is not None:
+                filter_ = add_conditioning(filter_, conditioning_inputs)
 
-    if conditioning_inputs is not None:
-        filter_ = add_conditioning(filter_, conditioning_inputs)
-        gate = add_conditioning(gate, conditioning_inputs)
+            filter_ = tf.tanh(filter_)
 
-    return tf.sigmoid(gate) * tf.tanh(filter_)
+        with tf.name_scope('gate'):
+            gate = conv1d(inputs, filters, dilation)
+            if conditioning_inputs is not None:
+                gate = add_conditioning(gate, conditioning_inputs)
+
+            gate = tf.sigmoid(gate)
+
+        return filter_ * gate
 
 
 def conv1d(inputs, filters, dilation):
