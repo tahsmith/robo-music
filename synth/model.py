@@ -1,62 +1,6 @@
 import tensorflow as tf
 
 
-def add_conditioning(inputs, conditioning):
-    conditioning_layer = tf.layers.dense(conditioning, 1)
-    shape = tf.shape(inputs)
-
-    input_flattened = tf.reshape(inputs, [shape[0], shape[1] * shape[2]])
-
-    output = conditioning_layer + input_flattened
-    output = tf.reshape(output, shape)
-
-    return output
-
-
-def conv_layer(inputs, conditioning_inputs, filters, dilation, mode):
-    with tf.name_scope('conv_layer'):
-        with tf.name_scope('filter'):
-            filter_ = conv1d(inputs, filters, dilation)
-            if conditioning_inputs is not None:
-                filter_ = add_conditioning(filter_, conditioning_inputs)
-
-            filter_ = tf.tanh(filter_)
-
-        with tf.name_scope('gate'):
-            gate = conv1d(inputs, filters, dilation)
-            if conditioning_inputs is not None:
-                gate = add_conditioning(gate, conditioning_inputs)
-
-            gate = tf.sigmoid(gate)
-
-        return filter_ * gate + inputs[:, dilation:, :]
-
-
-def conv1d(inputs, filters, dilation):
-    return tf.layers.conv1d(inputs,
-                            filters=filters,
-                            kernel_size=2,
-                            dilation_rate=dilation,
-                            padding='valid')
-
-
-def params_from_config():
-    from config import config_dict
-    audio_config = config_dict['audio']
-    synth_config = config_dict['synth']
-    return {
-        'slice_size': synth_config['slice_size'],
-        'channels': audio_config['channels'],
-        'dilation_stack_depth': synth_config['dilation_stack_depth'],
-        'dilation_stack_count': synth_config['dilation_stack_count'],
-        'filters': synth_config['filters'],
-        'quantisation': synth_config['quantisation'],
-        'regularisation': synth_config['regularisation'],
-        'dropout': synth_config['dropout'],
-        'conditioning': synth_config['conditioning']
-    }
-
-
 def model_fn(features, labels, mode, params):
     with tf.variable_scope('synth'):
         waveform = features['waveform']
@@ -149,3 +93,59 @@ def model_fn(features, labels, mode, params):
             loss,
             eval_metric_ops=eval_metric_ops
         )
+
+
+def conv_layer(inputs, conditioning_inputs, filters, dilation, mode):
+    with tf.name_scope('conv_layer'):
+        with tf.name_scope('filter'):
+            filter_ = conv1d(inputs, filters, dilation)
+            if conditioning_inputs is not None:
+                filter_ = add_conditioning(filter_, conditioning_inputs)
+
+            filter_ = tf.tanh(filter_)
+
+        with tf.name_scope('gate'):
+            gate = conv1d(inputs, filters, dilation)
+            if conditioning_inputs is not None:
+                gate = add_conditioning(gate, conditioning_inputs)
+
+            gate = tf.sigmoid(gate)
+
+        return filter_ * gate + inputs[:, dilation:, :]
+
+
+def add_conditioning(inputs, conditioning):
+    conditioning_layer = tf.layers.dense(conditioning, 1)
+    shape = tf.shape(inputs)
+
+    input_flattened = tf.reshape(inputs, [shape[0], shape[1] * shape[2]])
+
+    output = conditioning_layer + input_flattened
+    output = tf.reshape(output, shape)
+
+    return output
+
+
+def conv1d(inputs, filters, dilation):
+    return tf.layers.conv1d(inputs,
+                            filters=filters,
+                            kernel_size=2,
+                            dilation_rate=dilation,
+                            padding='valid')
+
+
+def params_from_config():
+    from config import config_dict
+    audio_config = config_dict['audio']
+    synth_config = config_dict['synth']
+    return {
+        'slice_size': synth_config['slice_size'],
+        'channels': audio_config['channels'],
+        'dilation_stack_depth': synth_config['dilation_stack_depth'],
+        'dilation_stack_count': synth_config['dilation_stack_count'],
+        'filters': synth_config['filters'],
+        'quantisation': synth_config['quantisation'],
+        'regularisation': synth_config['regularisation'],
+        'dropout': synth_config['dropout'],
+        'conditioning': synth_config['conditioning']
+    }
