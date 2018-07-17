@@ -1,5 +1,3 @@
-from functools import partial
-
 import tensorflow as tf
 
 
@@ -15,9 +13,9 @@ def add_conditioning(inputs, conditioning):
     return output
 
 
-def layer(inputs, conv_fn, conditioning_inputs, mode):
-    filter_ = conv_fn(inputs)
-    gate = conv_fn(inputs)
+def layer(inputs, conditioning_inputs, filters, dilation, mode):
+    filter_ = conv1d(inputs, filters, dilation)
+    gate = conv1d(inputs, filters, dilation)
 
     if conditioning_inputs is not None:
         filter_ = add_conditioning(filter_, conditioning_inputs)
@@ -26,11 +24,11 @@ def layer(inputs, conv_fn, conditioning_inputs, mode):
     return tf.sigmoid(gate) * tf.tanh(filter_)
 
 
-def conv1d(inputs, filters):
+def conv1d(inputs, filters, dilation):
     return tf.layers.conv1d(inputs,
                             filters=filters,
                             kernel_size=2,
-                            strides=2,
+                            dilation_rate=dilation,
                             padding='valid')
 
 
@@ -40,7 +38,8 @@ def params_from_config():
     synth_config = config_dict['synth']
     return {
         'channels': audio_config['channels'],
-        'layers': synth_config['layers'],
+        'dilation_stack_depth': synth_config['dilation_stack_depth'],
+        'dilation_stack_count': synth_config['dilation_stack_count'],
         'filters': synth_config['filters'],
         'quantisation': synth_config['quantisation'],
         'regularisation': synth_config['regularisation'],
@@ -62,7 +61,8 @@ def model_fn(features, labels, mode, params):
         quantisation = params['quantisation']
         regularisation = params['regularisation']
         dropout = params['dropout']
-        layers = params['layers']
+        dilation_stack_depth = params['dilation_stack_depth']
+        dilation_stack_count = params['dilation_stack_count']
 
         assert channels == 1
         one_hot = tf.one_hot(
@@ -75,10 +75,15 @@ def model_fn(features, labels, mode, params):
         output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
                                   filters=filters)
 
-        conv = partial(conv1d, filters=filters)
+        dilation_layers = [
+            2 ** i
+            for _ in range(dilation_stack_count)
+            for i in range(dilation_stack_depth)
+        ]
 
-        for i in range(layers):
-            output = layer(output, conv, conditioning, mode)
+        for dilation in dilation_layers:
+            output = layer(output, conditioning, filters, dilation, mode)
+            layers.append(output)
             if dropout:
                 output = tf.layers.dropout(
                     output,
@@ -108,8 +113,9 @@ def model_fn(features, labels, mode, params):
             reg_loss = tf.add_n([tf.nn.l2_loss(x) for x in trainable_vars])
             loss += regularisation * reg_loss
 
-        training_op = tf.train.AdamOptimizer().minimize(loss,
-                                                        tf.train.get_global_step())
+        optimizer = tf.train.AdamOptimizer()
+        training_op = optimizer.minimize(loss,
+                                         tf.train.get_global_step())
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
