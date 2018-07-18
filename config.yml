@@ -16,7 +16,7 @@ synth:
   slice_size: 2048
   quantisation: 256
   prepare_batch_size: 10000
-  batch_size: 100
+  batch_size: 10
   steps: 100000
   steps_per_eval: 1000
   eval_steps: 100
@@ -25,4 +25,6 @@ synth:
   dropout: 0.0
   dilation_stack_depth: 9
   dilation_stack_count: 2
-  filters: 24
+  conv_filters: 32
+  residual_filters: 32
+  skip_filters: 512

@@ -51,6 +51,8 @@ def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
         channels=channels
     ).astype(np.float32)
 
+    conditioning_waveform = conditioning_waveform[:sample_rate * 10, :]
+
     conditioning_waveform = clip_to_slice_size(slice_size,
                                                conditioning_waveform)
 

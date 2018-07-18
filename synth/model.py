@@ -15,7 +15,9 @@ def model_fn(features, labels, mode, params):
 
         input_width = params['slice_size'] - 1
         channels = params['channels']
-        filters = params['filters']
+        residual_filters = params['residual_filters']
+        conv_filters = params['conv_filters']
+        skip_filters = params['skip_filters']
         quantisation = params['quantisation']
         regularisation = params['regularisation']
         dropout = params['dropout']
@@ -31,7 +33,7 @@ def model_fn(features, labels, mode, params):
         one_hot = tf.reshape(one_hot, [-1, 2047, quantisation])
 
         output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
-                                  filters=filters)
+                                  filters=residual_filters)
 
         dilation_layers = [
             2 ** i
@@ -41,20 +43,27 @@ def model_fn(features, labels, mode, params):
         layers = []
 
         for dilation in dilation_layers:
-            output = conv_layer(output, conditioning, filters, dilation, mode)
+            output, skip = conv_layer(output, conditioning, residual_filters,
+                                      conv_filters, skip_filters, dilation,
+                                      mode)
             if dropout:
                 output = tf.layers.dropout(
                     output,
                     rate=dropout,
                     training=mode == tf.estimator.ModeKeys.TRAIN
                 )
-            layers.append(output)
+            layers.append(skip)
 
         output_width = input_width - sum(dilation_layers) - 1
         output = tf.add_n([layer[:, -output_width:, :] for layer in layers])
 
-        flatten = tf.layers.flatten(output)
-        logits = tf.layers.dense(flatten, quantisation)
+        with tf.name_scope('fc_stack'):
+            flatten = tf.layers.flatten(output)
+            dense1 = tf.layers.dense(flatten, quantisation, activation=tf.nn.elu,
+                                     name='dense1')
+            logits = tf.layers.dense(dense1, quantisation,
+                                     name='dense2')
+
         predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
 
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -99,24 +108,27 @@ def model_fn(features, labels, mode, params):
         )
 
 
-def conv_layer(inputs, conditioning_inputs, filters, dilation, mode):
+def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
+               skip_filters, dilation, mode):
     with tf.name_scope('conv_layer'):
         with tf.name_scope('filter'):
-            filter_ = conv1d(inputs, filters, dilation)
+            filter_ = conv1d(inputs, conv_filters, dilation)
             if conditioning_inputs is not None:
                 filter_ = add_conditioning(filter_, conditioning_inputs,
                                            filters)
-
             filter_ = tf.tanh(filter_)
 
         with tf.name_scope('gate'):
-            gate = conv1d(inputs, filters, dilation)
+            gate = conv1d(inputs, conv_filters, dilation)
             if conditioning_inputs is not None:
                 gate = add_conditioning(gate, conditioning_inputs, filters)
-
             gate = tf.sigmoid(gate)
 
-        return filter_ * gate + inputs[:, dilation:, :]
+        layer_outputs = tf.layers.conv1d(filter_ * gate, filters, 1)
+        residual = layer_outputs + inputs[:, dilation:, :]
+        skip_outputs = tf.layers.conv1d(filter_ * gate, skip_filters, 1)
+
+        return residual, skip_outputs
 
 
 def add_conditioning(inputs, conditioning, filters):
@@ -142,7 +154,9 @@ def params_from_config():
         'channels': audio_config['channels'],
         'dilation_stack_depth': synth_config['dilation_stack_depth'],
         'dilation_stack_count': synth_config['dilation_stack_count'],
-        'filters': synth_config['filters'],
+        'residual_filters': synth_config['residual_filters'],
+        'conv_filters': synth_config['conv_filters'],
+        'skip_filters': synth_config['skip_filters'],
         'quantisation': synth_config['quantisation'],
         'regularisation': synth_config['regularisation'],
         'dropout': synth_config['dropout'],
