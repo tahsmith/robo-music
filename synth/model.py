@@ -58,7 +58,7 @@ def model_fn(features, labels, mode, params):
         output = tf.add_n([layer[:, -output_width:, :] for layer in layers])
 
         with tf.name_scope('fc_stack'):
-            flatten = tf.layers.flatten(output)
+            flatten = tf.nn.elu(tf.layers.flatten(output))
             dense1 = tf.layers.dense(flatten, quantisation, activation=tf.nn.elu,
                                      name='dense1')
             logits = tf.layers.dense(dense1, quantisation,
