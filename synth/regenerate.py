@@ -14,6 +14,10 @@ def main(argv):
     model_path = argv[1]
     conditioning_file_path = argv[2]
     output_path = argv[3]
+    try:
+        time = int(argv[4])
+    except IndexError:
+        time = 2.0
 
     from config import config_dict
     sample_rate = config_dict['audio']['sample_rate']
@@ -23,14 +27,14 @@ def main(argv):
     n_mels = 128
 
     regenerate(model_path, conditioning_file_path, output_path, n_mels,
-               channels, quantisation, sample_rate, slice_size)
+               channels, quantisation, sample_rate, slice_size, time)
 
 
 def regenerate(model_path, conditioning_file_path, output_path, n_mels,
-               channels, quantisation, sample_rate, slice_size):
+               channels, quantisation, sample_rate, slice_size, time):
     waveform, conditioning = load_conditioning(channels, conditioning_file_path,
                                                n_mels, sample_rate, slice_size,
-                                               quantisation)
+                                               quantisation, time)
 
     waveform = regenerate_with_conditioning(model_path, waveform, quantisation,
                                             conditioning,
@@ -43,7 +47,7 @@ def regenerate(model_path, conditioning_file_path, output_path, n_mels,
 
 
 def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
-                      slice_size, quantisation):
+                      slice_size, quantisation, time):
     conditioning_waveform = ffmpeg.load_sound_file(
         conditioning_file_path,
         dtype=np.int16,
@@ -51,7 +55,7 @@ def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
         channels=channels
     ).astype(np.float32)
 
-    conditioning_waveform = conditioning_waveform[:sample_rate * 10, :]
+    conditioning_waveform = conditioning_waveform[:int(sample_rate * time), :]
 
     conditioning_waveform = clip_to_slice_size(slice_size,
                                                conditioning_waveform)
