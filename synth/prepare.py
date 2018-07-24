@@ -64,7 +64,7 @@ def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
     return spec
 
 
-def augment_sample(sample, noise_level=0.1):
+def augment_sample(sample, noise_level=0.0):
     sample = sample.astype(np.float32)
     scale = 2 ** np.random.uniform(-1.0, 1.0)
     noise = np.random.randn(*sample.shape) * noise_level
@@ -75,12 +75,12 @@ def augment_sample(sample, noise_level=0.1):
     return sample
 
 
-def augment(waveform, times=2):
+def augment(waveform, times=2, noise=0.0):
     augmented_waveform = waveform
     for i in range(times):
         augmented_waveform = np.concatenate([
             augmented_waveform,
-            augment_sample(waveform)
+            augment_sample(waveform, noise)
         ], axis=0)
 
     return augmented_waveform
@@ -108,7 +108,7 @@ def clip_to_slice_size(slice_size, waveform):
     return waveform
 
 
-def pad_waveform(waveform, padding, channels, noise=0.1):
+def pad_waveform(waveform, padding, channels, noise=0.0):
     left_pad = padding // 2
     right_pad = padding // 2 + padding % 2
 
@@ -133,7 +133,7 @@ def normalise_waveform(waveform, channels):
 
 
 def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
-                             augmentation):
+                             augmentation, noise):
     chunk = np.zeros((0, channels))
     file_list = iter(enumerate(file_list))
     i = -1
@@ -144,8 +144,9 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
                 i, file = next(file_list)
                 current_file_data = np.load(file)
                 current_file_data = pad_waveform(current_file_data, slice_size,
-                                                 channels)
-                current_file_data = augment(current_file_data, augmentation)
+                                                 channels, noise)
+                current_file_data = augment(current_file_data, augmentation,
+                                            noise)
                 current_file_data = normalise_waveform(current_file_data,
                                                        channels)
 
@@ -179,6 +180,7 @@ def waveform_to_samples(waveform, sample_rate, slice_size,
     assert np.all(samples <= 255)
     assert np.all(samples >= 0)
 
+    features = np.zeros_like(samples)
     return samples, features
 
 
@@ -226,6 +228,7 @@ def main():
     n_mels = config_dict['classifier']['n_mels']
     stride = synth_config['sample_stride']
     augmentation = synth_config['sample_augmentation']
+    augmentation_noise = synth_config['augmentation_noise']
 
     input_files = list_input_files(data_config['cache'])
     print(f'files: {input_files}')
@@ -237,13 +240,9 @@ def main():
     chunk_size = chunk_size - chunk_size % slice_size
 
     def generate_waveforms():
-        return files_to_waveform_chunks(
-            input_files,
-            channels,
-            chunk_size,
-            slice_size,
-            augmentation
-        )
+        return files_to_waveform_chunks(input_files, channels, chunk_size,
+                                        slice_size, augmentation,
+                                        augmentation_noise)
 
     def make_batch(x):
         i, x = x
