@@ -63,10 +63,9 @@ def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
 
     return spec
 
-
-def augment_sample(sample, noise_level=0.0):
+def augment_sample(sample, noise_level=0.0, scale_range=1.0):
     sample = sample.astype(np.float32)
-    scale = 2 ** np.random.uniform(-1.0, 1.0)
+    scale = scale_range ** np.random.uniform(-1.0, 1.0)
     noise = np.random.randn(*sample.shape) * noise_level
 
     sample *= scale
@@ -75,12 +74,12 @@ def augment_sample(sample, noise_level=0.0):
     return sample
 
 
-def augment(waveform, times=2, noise=0.0):
+def augment(waveform, times=2, noise=0.0, scale=1.0):
     augmented_waveform = waveform
     for i in range(times):
         augmented_waveform = np.concatenate([
             augmented_waveform,
-            augment_sample(waveform, noise)
+            augment_sample(waveform, noise, scale)
         ], axis=0)
 
     return augmented_waveform
@@ -133,7 +132,7 @@ def normalise_waveform(waveform, channels):
 
 
 def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
-                             augmentation, noise):
+                             augmentation, noise, scale):
     chunk = np.zeros((0, channels))
     file_list = iter(enumerate(file_list))
     i = -1
@@ -146,7 +145,7 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
                 current_file_data = pad_waveform(current_file_data, slice_size,
                                                  channels, noise)
                 current_file_data = augment(current_file_data, augmentation,
-                                            noise)
+                                            noise, scale)
                 current_file_data = normalise_waveform(current_file_data,
                                                        channels)
 
@@ -229,6 +228,7 @@ def main():
     stride = synth_config['sample_stride']
     augmentation = synth_config['sample_augmentation']
     augmentation_noise = synth_config['augmentation_noise']
+    augmentation_scale_range = synth_config['augmentation_scale_range']
 
     input_files = list_input_files(data_config['cache'])
     print(f'files: {input_files}')
@@ -242,7 +242,8 @@ def main():
     def generate_waveforms():
         return files_to_waveform_chunks(input_files, channels, chunk_size,
                                         slice_size, augmentation,
-                                        augmentation_noise)
+                                        augmentation_noise,
+                                        augmentation_scale_range)
 
     def make_batch(x):
         i, x = x
@@ -269,7 +270,7 @@ def main():
     print('features  {}'.format(n_mels))
     print('samples   {}'.format(n_samples))
 
-    for n in range(2 * i):
+    for n in range(i * (i - 1) // 2):
         print(f'shuffling {n}')
         file_shuffle(i)
 
