@@ -1,3 +1,6 @@
+sys:
+  cpus: 2
+
 data:
   input: './data'
   cache: './cache'
@@ -11,20 +14,22 @@ classifier:
   n_mels: 128
 
 synth:
-  sample_augmentation: 2
-  sample_stride: 16
-  slice_size: 2048
+  sample_augmentation: 4
+  augmentation_noise: 0.05
+  augmentation_scale_range: 1.5
+  sample_stride: 1
+  slice_size: 11025
   quantisation: 256
-  prepare_batch_size: 10000
-  batch_size: 10
+  prepare_batch_size: 20000
+  batch_size: 50
   steps: 100000
   steps_per_eval: 1000
   eval_steps: 100
-  conditioning: true
-  regularisation: 0.001
+  conditioning: false
+  regularisation: 0.0
   dropout: 0.0
   dilation_stack_depth: 9
-  dilation_stack_count: 2
+  dilation_stack_count: 4
   conv_filters: 32
   residual_filters: 32
   skip_filters: 512

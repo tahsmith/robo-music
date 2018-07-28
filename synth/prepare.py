@@ -1,6 +1,9 @@
 import glob
 import os
+from functools import partial
 from random import shuffle
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
 
 from numpy import random
 
@@ -44,24 +47,27 @@ def quantise(x, quantisation):
 
 
 def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
-    if waveform.shape[1] == 1:
-        waveform = waveform.reshape((-1))
+    waveform_padded = pad_waveform(waveform, slice_size - 1, 0, 0)
 
-    spec = np.abs(librosa.stft(waveform, n_fft=slice_size, hop_length=stride,
-                               center=False)) ** 2
-
+    if waveform_padded.shape[1] == 1:
+        waveform_padded = waveform_padded.reshape((-1))
+    spec = np.abs(
+        librosa.stft(waveform_padded, n_fft=slice_size, hop_length=stride,
+                     center=False)) ** 2
     spec = librosa.feature.melspectrogram(
         waveform,
         sample_rate,
         S=spec,
         n_mels=n_mels
     )
-
     spec = librosa.power_to_db(spec)
 
     spec = spec.transpose((1, 0)).astype(np.float32)
 
+    assert spec.shape[0] == waveform.shape[0]
+
     return spec
+
 
 def augment_sample(sample, noise_level=0.0, scale_range=1.0):
     sample = sample.astype(np.float32)
@@ -107,10 +113,8 @@ def clip_to_slice_size(slice_size, waveform):
     return waveform
 
 
-def pad_waveform(waveform, padding, channels, noise=0.0):
-    left_pad = padding // 2
-    right_pad = padding // 2 + padding % 2
-
+def pad_waveform(waveform, left_pad, right_pad, noise=0.0):
+    channels = waveform.shape[1]
     return np.concatenate([
         np.random.randn(left_pad, channels) * noise,
         waveform,
@@ -142,8 +146,12 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
             if current_file_data.shape[0] == 0:
                 i, file = next(file_list)
                 current_file_data = np.load(file)
-                current_file_data = pad_waveform(current_file_data, slice_size,
-                                                 channels, noise)
+                current_file_data = pad_waveform(
+                    current_file_data,
+                    slice_size // 2,
+                    slice_size // 2 + slice_size % 2,
+                    noise
+                )
                 current_file_data = augment(current_file_data, augmentation,
                                             noise, scale)
                 current_file_data = normalise_waveform(current_file_data,
@@ -159,28 +167,29 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
                 current_file_data = current_file_data[cut:, :]
             else:
                 assert chunk.shape[0] == chunk_size
-                yield i, chunk
+                yield chunk
                 chunk = np.zeros((0, channels))
         except StopIteration:
-            # yield i, chunk
+            # yield chunk
             break
 
 
 def waveform_to_samples(waveform, sample_rate, slice_size,
                         stride, n_mels, quantisation):
+    waveform = clip_to_slice_size(slice_size, waveform)
     features = compute_features(waveform, sample_rate, slice_size,
                                 stride, n_mels)
 
     # last slice may not be chunck sized
-    waveform = clip_to_slice_size(slice_size, waveform)
-    samples = create_samples(waveform, slice_size, stride)
-    samples = quantise(samples, quantisation)
+    waveform = quantise(waveform, quantisation)
 
-    assert np.all(samples <= 255)
-    assert np.all(samples >= 0)
+    waveform = waveform.reshape(-1, slice_size, waveform.shape[1])
+    features = features.reshape(-1, slice_size, n_mels)
 
-    features = np.zeros_like(samples)
-    return samples, features
+    assert np.all(waveform <= 255)
+    assert np.all(waveform >= 0)
+
+    return waveform, features
 
 
 def file_shuffle(file_count):
@@ -214,7 +223,26 @@ def file_shuffle(file_count):
     save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
-def main():
+def make_batch(output_path, sample_rate, slice_size, stride, n_mels,
+               quantisation, i, x):
+    slices, features = waveform_to_samples(x, sample_rate,
+                                           slice_size, stride, n_mels,
+                                           quantisation)
+
+    save_array(slices, f'{output_path}/synth/waveform_{i}.npy')
+    save_array(features, f'{output_path}/synth/features_{i}.npy')
+
+    return slices.shape[0]
+
+
+async def log(i, work):
+    size = await work
+    print(f'batch {i}')
+
+    return size
+
+
+async def main():
     from config import config_dict
     synth_config = config_dict['synth']
     audio_config = config_dict['audio']
@@ -245,35 +273,27 @@ def main():
                                         augmentation_noise,
                                         augmentation_scale_range)
 
-    def make_batch(x):
-        i, x = x
-        return waveform_to_samples(x, sample_rate,
-                                   slice_size, stride, n_mels,
-                                   quantisation)
-
-    samples = (make_batch(x) for x in generate_waveforms())
-
     try:
         os.mkdir('./cache/synth/')
     except FileExistsError:
         pass
 
-    n_samples = 0
+    make_batch_part = partial(make_batch, data_config['cache'], sample_rate,
+                              slice_size,
+                              stride, n_mels, quantisation)
+    executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
+    loop = asyncio.get_event_loop()
 
-    for i, (samples, features) in enumerate(samples):
-        save_array(samples, f'./cache/synth/waveform_{i}.npy')
-        save_array(features, f'./cache/synth/features_{i}.npy')
-        n_samples += samples.shape[0]
-        print(f'batch {i}')
+    processed = asyncio.gather(*(
+        log(i, loop.run_in_executor(executor, make_batch_part, i, x))
+        for i, x in enumerate(generate_waveforms())
+    ))
+
+    n_samples = sum(await processed)
 
     print("Summary:")
     print('features  {}'.format(n_mels))
     print('samples   {}'.format(n_samples))
 
-    for n in range(i * (i - 1) // 2):
-        print(f'shuffling {n}')
-        file_shuffle(i)
-
-
 if __name__ == '__main__':
-    main()
+    asyncio.get_event_loop().run_until_complete(main())
