@@ -208,23 +208,22 @@ def file_shuffle(file_count):
     save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
-def make_batch(output_path, sample_rate, slice_size, stride, n_mels,
-               quantisation, i, x):
-    slices, features = waveform_to_samples(x, sample_rate,
-                                           slice_size, stride, n_mels,
-                                           quantisation)
+async def make_batch(output_path, sample_rate, slice_size, stride, n_mels,
+                     quantisation, i, x):
+    slices, features = await asyncio.get_event_loop().run_in_executor(
+        None,
+        waveform_to_samples,
+        x,
+        sample_rate,
+        slice_size, stride, n_mels,
+        quantisation
+    )
 
     save_array(slices, f'{output_path}/synth/waveform_{i}.npy')
     save_array(features, f'{output_path}/synth/features_{i}.npy')
 
-    return slices.shape[0]
-
-
-async def log(i, work):
-    size = await work
-    print(f'batch {i}')
-
-    return size
+    print(f'batch {i}: {slices.shape} {features.shape}')
+    return slices.shape
 
 
 async def main():
@@ -267,9 +266,10 @@ async def main():
                               slice_size, stride, n_mels, quantisation)
     executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
     loop = asyncio.get_event_loop()
+    loop.set_default_executor(executor)
 
     processed = asyncio.gather(*(
-        log(i, loop.run_in_executor(executor, make_batch_part, i, x))
+        make_batch_part(i, x)
         for i, x in enumerate(generate_waveforms())
     ))
 
@@ -278,6 +278,7 @@ async def main():
     print("Summary:")
     print('features  {}'.format(n_mels))
     print('samples   {}'.format(n_samples))
+
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())
