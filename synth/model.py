@@ -4,7 +4,6 @@ import tensorflow as tf
 def model_fn(features, mode, params):
     with tf.variable_scope('synth'):
         waveform = features['waveform'][:, :-1, :]
-        labels = features['waveform'][:, -1, :]
         if params['conditioning']:
             conditioning = features['conditioning']
             conditioning = tf.reshape(conditioning, [-1, 128])
@@ -59,13 +58,13 @@ def model_fn(features, mode, params):
         output = tf.add_n([layer[:, -output_width:, :] for layer in layers])
 
         with tf.name_scope('fc_stack'):
-            flatten = tf.nn.elu(tf.layers.flatten(output))
-            dense1 = tf.layers.dense(flatten, quantisation, activation=tf.nn.elu,
-                                     name='dense1')
-            logits = tf.layers.dense(dense1, quantisation,
-                                     name='dense2')
+            output = tf.nn.elu(output)
+            output = tf.layers.conv1d(output, skip_filters, 1,
+                                      activation=tf.nn.elu)
+            logits = tf.layers.conv1d(output, quantisation, 1,
+                                      activation=None)
 
-        predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
+        predictions = tf.argmax(logits, axis=2, output_type=tf.int32)
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -75,6 +74,9 @@ def model_fn(features, mode, params):
                         {"predictions": predictions,
                          'probabilities': tf.nn.softmax(logits)})})
 
+        n_predictions = tf.shape(logits)[1]
+        target_waveform = features['waveform']
+        labels = target_waveform[:, -n_predictions:]
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels,
                                                       logits=logits)
 
