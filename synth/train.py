@@ -41,7 +41,7 @@ def input_generator(waveform_files, feature_files, batch_size):
         waveform = np.load(waveform_file)
         features = np.load(feature_file)
 
-        for i in range((waveform.shape[0] // batch_size) - 1):
+        for i in range(waveform.shape[0] // batch_size):
             begin = i * batch_size
             end = begin + batch_size
             yield {
@@ -56,7 +56,7 @@ def input_function_from_file(waveform_files, feature_files, batch_size,
         return tf.data.Dataset.from_generator(
             partial(input_generator, waveform_files, feature_files, batch_size),
             {'waveform': tf.int32, 'conditioning': tf.float32}
-        ).prefetch(prefetch)
+        ).repeat().prefetch(prefetch)
 
     return input_fn
 
