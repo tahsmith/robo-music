@@ -1,9 +1,10 @@
 import tensorflow as tf
 
 
-def model_fn(features, labels, mode, params):
+def model_fn(features, mode, params):
     with tf.variable_scope('synth'):
-        waveform = features['waveform']
+        waveform = features['waveform'][:, :-1, :]
+        labels = features['waveform'][:, -1, :]
         if params['conditioning']:
             conditioning = features['conditioning']
             conditioning = tf.reshape(conditioning, [-1, 128])

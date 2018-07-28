@@ -91,21 +91,6 @@ def augment(waveform, times=2, noise=0.0, scale=1.0):
     return augmented_waveform
 
 
-def create_samples(waveform, slice_size, stride):
-    channels = waveform.shape[1]
-    n_samples = (waveform.shape[0] - slice_size) // stride + 1
-    # guard against waveform being too small to make a sample
-    n_samples = max(n_samples, 0)
-    samples = np.empty((n_samples, slice_size, channels), waveform.dtype)
-    for i in range(n_samples):
-        begin = i * stride
-        end = begin + slice_size
-        assert (end <= waveform.shape[0])
-        slice_ = waveform[begin:end]
-        samples[i, :, :] = slice_
-    return samples
-
-
 def clip_to_slice_size(slice_size, waveform):
     remainder = waveform.shape[0] % slice_size
     if remainder != 0:
@@ -279,8 +264,7 @@ async def main():
         pass
 
     make_batch_part = partial(make_batch, data_config['cache'], sample_rate,
-                              slice_size,
-                              stride, n_mels, quantisation)
+                              slice_size, stride, n_mels, quantisation)
     executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
     loop = asyncio.get_event_loop()
 

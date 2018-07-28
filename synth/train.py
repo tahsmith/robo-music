@@ -21,26 +21,6 @@ def load_batch(file):
     return x_test, y_test
 
 
-def load_data(cache_path):
-    x_train, y_train = load_batch(f'{cache_path}/synth/waveform_train.npy')
-    conditioning_train = np.load(f'{cache_path}/synth/features_train.npy')
-
-    x_test, y_test = load_batch(f'{cache_path}/synth/waveform_test.npy')
-    conditioning_test = np.load(f'{cache_path}/synth/features_test.npy')
-
-    features_train = {
-        'waveform': x_train,
-        'conditioning': conditioning_train
-    }
-
-    features_test = {
-        'waveform': x_test,
-        'conditioning': conditioning_test
-    }
-
-    return (features_train, y_train), (features_test, y_test)
-
-
 def baseline_model(conditioning_features, quantisation, model_dir):
     return tf.estimator.LinearClassifier(
         [
@@ -58,18 +38,16 @@ def input_generator(waveform_files, feature_files, batch_size):
     pairs = list(zip(waveform_files, feature_files))
     shuffle(pairs)
     for waveform_file, feature_file in pairs:
-        waveform, label = load_batch(waveform_file)
+        waveform = np.load(waveform_file)
         features = np.load(feature_file)
+
         for i in range((waveform.shape[0] // batch_size) - 1):
             begin = i * batch_size
             end = begin + batch_size
-            yield (
-                {
-                    'waveform': waveform[begin:end, :, :],
-                    'conditioning': features[begin:end, :]
-                },
-                label[begin:end]
-            )
+            yield {
+                'waveform': waveform[begin:end, :, :],
+                'conditioning': features[begin:end, :]
+            }
 
 
 def input_function_from_file(waveform_files, feature_files, batch_size,
@@ -77,7 +55,7 @@ def input_function_from_file(waveform_files, feature_files, batch_size,
     def input_fn():
         return tf.data.Dataset.from_generator(
             partial(input_generator, waveform_files, feature_files, batch_size),
-            ({'waveform': tf.int32, 'conditioning': tf.float32}, tf.int32)
+            {'waveform': tf.int32, 'conditioning': tf.float32}
         ).prefetch(prefetch)
 
     return input_fn
