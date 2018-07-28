@@ -30,7 +30,7 @@ def model_fn(features, labels, mode, params):
             quantisation
         )
 
-        one_hot = tf.reshape(one_hot, [-1, 2047, quantisation])
+        one_hot = tf.reshape(one_hot, [-1, input_width, quantisation])
 
         output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
                                   filters=residual_filters)
