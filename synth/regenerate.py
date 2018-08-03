@@ -124,7 +124,11 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     sess.run(tf.global_variables_initializer())
     new_saver.restore(sess, tf.train.latest_checkpoint(model_path))
 
-    output_waveform = init_waveform[:slice_size - 1, :]
+    initial_shape = (slice_size - 1, 1)
+    output_waveform = np.ones(initial_shape, dtype=np.int32) * 256 // 2 \
+                      + np.random.choice([0, 1], initial_shape)
+    output_waveform[-1, 0] = np.random.randint(0, 255)
+    # output_waveform = init_waveform[:slice_size - 1]
     for i in range(conditioning.shape[0] // 1000):
         sess.run(limit.assign(1000))
         sess.run(waveform.assign(output_waveform[-(slice_size - 1):, :]))

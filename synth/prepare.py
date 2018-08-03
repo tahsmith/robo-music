@@ -46,13 +46,13 @@ def quantise(x, quantisation):
     return mu_law_encode(x, quantisation)
 
 
-def compute_features(waveform, sample_rate, slice_size, stride, n_mels):
-    waveform_padded = pad_waveform(waveform, slice_size - 1, 0, 0)
+def compute_features(waveform, sample_rate, feature_window, n_mels):
+    waveform_padded = pad_waveform(waveform, feature_window - 1, 0, 0)
 
     if waveform_padded.shape[1] == 1:
         waveform_padded = waveform_padded.reshape((-1))
     spec = np.abs(
-        librosa.stft(waveform_padded, n_fft=slice_size, hop_length=stride,
+        librosa.stft(waveform_padded, n_fft=feature_window, hop_length=1,
                      center=False)) ** 2
     spec = librosa.feature.melspectrogram(
         waveform,
@@ -159,13 +159,11 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
             break
 
 
-def waveform_to_samples(waveform, sample_rate, slice_size,
-                        stride, n_mels, quantisation):
+def waveform_to_samples(waveform, sample_rate, slice_size, feature_window,
+                        n_mels, quantisation):
     waveform = clip_to_slice_size(slice_size, waveform)
-    features = compute_features(waveform, sample_rate, slice_size,
-                                stride, n_mels)
+    features = compute_features(waveform, sample_rate, feature_window, n_mels)
 
-    # last slice may not be chunck sized
     waveform = quantise(waveform, quantisation)
 
     waveform = waveform.reshape(-1, slice_size, waveform.shape[1])
@@ -208,14 +206,12 @@ def file_shuffle(file_count):
     save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
-async def make_batch(output_path, sample_rate, slice_size, stride, n_mels,
-                     quantisation, i, x):
+async def make_batch(output_path, sample_rate, slice_size, feature_window,
+                     n_mels, quantisation, i, x):
     slices, features = await asyncio.get_event_loop().run_in_executor(
         None,
         waveform_to_samples,
-        x,
-        sample_rate,
-        slice_size, stride, n_mels,
+        x, sample_rate, slice_size, feature_window, n_mels,
         quantisation
     )
 
@@ -223,7 +219,7 @@ async def make_batch(output_path, sample_rate, slice_size, stride, n_mels,
     save_array(features, f'{output_path}/synth/features_{i}.npy')
 
     print(f'batch {i}: {slices.shape} {features.shape}')
-    return slices.shape
+    return slices.shape[0]
 
 
 async def main():
@@ -232,12 +228,12 @@ async def main():
     audio_config = config_dict['audio']
     data_config = config_dict['data']
 
+    feature_window = synth_config['feature_window']
     slice_size = synth_config['slice_size']
     quantisation = synth_config['quantisation']
     channels = audio_config['channels']
     sample_rate = audio_config['sample_rate']
     n_mels = config_dict['classifier']['n_mels']
-    stride = synth_config['sample_stride']
     augmentation = synth_config['sample_augmentation']
     augmentation_noise = synth_config['augmentation_noise']
     augmentation_scale_range = synth_config['augmentation_scale_range']
@@ -263,7 +259,7 @@ async def main():
         pass
 
     make_batch_part = partial(make_batch, data_config['cache'], sample_rate,
-                              slice_size, stride, n_mels, quantisation)
+                              slice_size, feature_window, n_mels, quantisation)
     executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
     loop = asyncio.get_event_loop()
     loop.set_default_executor(executor)

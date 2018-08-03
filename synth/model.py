@@ -1,11 +1,24 @@
 import tensorflow as tf
 
 
+def dilation_stack_width(depth, count):
+    return sum(
+            2 ** i
+            for _ in range(count)
+            for i in range(depth)
+        )
+
+
+def model_width(depth, count):
+    return dilation_stack_width(depth, count) + 1
+
+
 def model_fn(features, mode, params):
     with tf.variable_scope('synth'):
-        waveform = features['waveform'][:, :-1, :]
+        waveform = features['waveform']
+        input_waveform = waveform[:, :-1, :]
         if params['conditioning']:
-            conditioning = features['conditioning']
+            conditioning = tf.cast(features['conditioning'])
             conditioning = tf.reshape(conditioning, [-1, 128])
             conditioning = tf.layers.dense(conditioning, 128)
             conditioning = tf.reshape(conditioning, [-1, 1, 128])
@@ -13,7 +26,6 @@ def model_fn(features, mode, params):
         else:
             conditioning = None
 
-        input_width = params['slice_size'] - 1
         channels = params['channels']
         residual_filters = params['residual_filters']
         conv_filters = params['conv_filters']
@@ -26,10 +38,11 @@ def model_fn(features, mode, params):
 
         assert channels == 1
         one_hot = tf.one_hot(
-            waveform[:, :, 0],
+            input_waveform[:, :, 0],
             quantisation
         )
 
+        input_width = tf.shape(input_waveform)[1]
         one_hot = tf.reshape(one_hot, [-1, input_width, quantisation])
 
         output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
@@ -75,7 +88,7 @@ def model_fn(features, mode, params):
                          'probabilities': tf.nn.softmax(logits)})})
 
         n_predictions = tf.shape(logits)[1]
-        target_waveform = features['waveform']
+        target_waveform = waveform
         labels = target_waveform[:, -n_predictions:]
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels,
                                                       logits=logits)
@@ -127,9 +140,11 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
                 gate = add_conditioning(gate, conditioning_inputs, filters)
             gate = tf.sigmoid(gate)
 
-        layer_outputs = tf.layers.conv1d(filter_ * gate, filters, 1)
+        dilation_output = filter_ * gate
+
+        layer_outputs = tf.layers.conv1d(dilation_output, filters, 1)
         residual = layer_outputs + inputs[:, dilation:, :]
-        skip_outputs = tf.layers.conv1d(filter_ * gate, skip_filters, 1)
+        skip_outputs = tf.layers.conv1d(dilation_output, skip_filters, 1)
 
         return residual, skip_outputs
 

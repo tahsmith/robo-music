@@ -56,7 +56,7 @@ def input_function_from_file(waveform_files, feature_files, batch_size,
         return tf.data.Dataset.from_generator(
             partial(input_generator, waveform_files, feature_files, batch_size),
             {'waveform': tf.int32, 'conditioning': tf.float32}
-        ).repeat().prefetch(prefetch)
+        ).repeat()
 
     return input_fn
 
