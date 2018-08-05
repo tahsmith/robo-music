@@ -39,7 +39,7 @@ def main(argv):
     data_config = config_dict['data']
 
     walk_dir(audio_dict['sample_rate'], audio_dict['channels'],
-             data_config['data'], data_config['cache'])
+             data_config['input'], data_config['cache'])
 
 
 if __name__ == '__main__':
