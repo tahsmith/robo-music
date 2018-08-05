@@ -238,7 +238,8 @@ async def main():
     augmentation_noise = synth_config['augmentation_noise']
     augmentation_scale_range = synth_config['augmentation_scale_range']
 
-    input_files = list_input_files(data_config['cache'])
+    cache_path = data_config['cache']
+    input_files = list_input_files(cache_path)
     print(f'files: {input_files}')
     shuffle(input_files)
 
@@ -254,11 +255,11 @@ async def main():
                                         augmentation_scale_range)
 
     try:
-        os.mkdir('./cache/synth/')
+        os.makedirs(f'{cache_path}/synth/', exist_ok=True)
     except FileExistsError:
         pass
 
-    make_batch_part = partial(make_batch, data_config['cache'], sample_rate,
+    make_batch_part = partial(make_batch, cache_path, sample_rate,
                               slice_size, feature_window, n_mels, quantisation)
     executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
     loop = asyncio.get_event_loop()
