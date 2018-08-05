@@ -23,8 +23,8 @@ synth:
   prepare_batch_size: 100000
   batch_size: 2
   steps: 200000
-  steps_per_eval: 100000
-  eval_steps: 100
+  steps_per_eval: 100
+  eval_steps: 1
   conditioning: false
   regularisation: 0.0
   dropout: false
