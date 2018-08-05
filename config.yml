@@ -22,7 +22,7 @@ synth:
   quantisation: 256
   prepare_batch_size: 100000
   batch_size: 2
-  steps: 200000
+  steps: 200
   steps_per_eval: 100
   eval_steps: 1
   conditioning: false
