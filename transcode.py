@@ -37,6 +37,7 @@ def main(argv):
     config_dict = parse_config('./config.yml')
     audio_dict = config_dict['audio']
     data_config = config_dict['data']
+    os.makedirs(data_config['cache'], exist_ok=True)
 
     walk_dir(audio_dict['sample_rate'], audio_dict['channels'],
              data_config['input'], data_config['cache'])
