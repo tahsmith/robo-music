@@ -18,9 +18,9 @@ def prep_file(infile, outfile, sample_rate, channels):
     np.save(outfile, processed_waveform, allow_pickle=False)
 
 
-def walk_dir(sample_rate, channels):
-    for root, dirs, files in os.walk('./data'):
-        cache_dir = root.replace('./data/', './cache/')
+def walk_dir(sample_rate, channels, data_dir, cache_dir):
+    for root, dirs, files in os.walk(data_dir):
+        cache_dir = root.replace(data_dir, cache_dir)
         if not os.path.isdir(cache_dir):
             os.mkdir(cache_dir)
         for file in files:
@@ -34,9 +34,12 @@ def walk_dir(sample_rate, channels):
 
 def main(argv):
     from config import parse_config
-    audio_dict = parse_config('./config.yml')['audio']
+    config_dict = parse_config('./config.yml')
+    audio_dict = config_dict['audio']
+    data_config = config_dict['data']
 
-    walk_dir(audio_dict['sample_rate'], audio_dict['channels'])
+    walk_dir(audio_dict['sample_rate'], audio_dict['channels'],
+             data_config['data'], data_config['cache'])
 
 
 if __name__ == '__main__':
