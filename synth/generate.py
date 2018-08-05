@@ -1,4 +1,5 @@
 import sys
+from glob import glob
 
 import numpy as np
 import tensorflow as tf
@@ -11,10 +12,9 @@ from utils import normalise_to_int_range
 
 
 def main(argv):
-    model_path = argv[1]
-    output_path = argv[2]
+    output_path = argv[1]
     try:
-        time = int(argv[3])
+        time = int(argv[2])
     except IndexError:
         time = 2.0
 
@@ -26,6 +26,7 @@ def main(argv):
     depth = config_dict['synth']['dilation_stack_depth']
     count = config_dict['synth']['dilation_stack_count']
     conditioning_file_path = config_dict['synth']['validation_file']
+    model_path = glob(config_dict['data']['logs'] + '/synth/*')[-1]
     n_mels = 128
 
     regenerate(model_path, conditioning_file_path, output_path, n_mels,

@@ -1,7 +1,5 @@
 import os
-import shutil
 import sys
-from shutil import rmtree
 
 import numpy as np
 
