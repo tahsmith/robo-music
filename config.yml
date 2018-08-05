@@ -33,3 +33,4 @@ synth:
   conv_filters: 64
   residual_filters: 64
   skip_filters: 128
+  validation_file: './data/music/sample1.wav'
