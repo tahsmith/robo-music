@@ -1,5 +1,7 @@
 import os
+import shutil
 import sys
+from shutil import rmtree
 
 import numpy as np
 
@@ -20,14 +22,14 @@ def prep_file(infile, outfile, sample_rate, channels):
 
 def walk_dir(sample_rate, channels, data_dir, cache_dir):
     for root, dirs, files in os.walk(data_dir):
-        cache_dir = root.replace(data_dir, cache_dir)
-        if not os.path.isdir(cache_dir):
-            os.mkdir(cache_dir)
+        cache_root = root.replace(data_dir, cache_dir)
+        if not os.path.isdir(cache_root):
+            os.mkdir(cache_root)
         for file in files:
             if file[0] not in {'.', '_'}:
                 file_path = root + '/' + file
                 prep_file(file_path,
-                          cache_dir + '/' + file,
+                          cache_root + '/' + file,
                           sample_rate,
                           channels)
 
