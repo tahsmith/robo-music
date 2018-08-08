@@ -14,7 +14,7 @@ classifier:
   n_mels: 1
 
 synth:
-  sample_augmentation: 8
+  sample_augmentation: 4
   augmentation_noise: 0.02
   augmentation_scale_range: 1.2
   feature_window: 2048
@@ -22,9 +22,9 @@ synth:
   quantisation: 256
   prepare_batch_size: 100000
   batch_size: 2
-  steps: 200
-  steps_per_eval: 100
-  eval_steps: 1
+  steps: 50000
+  steps_per_eval: 5000
+  eval_steps: 100
   conditioning: false
   regularisation: 0.0
   dropout: false
