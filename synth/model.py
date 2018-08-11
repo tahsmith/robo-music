@@ -18,7 +18,7 @@ def model_fn(features, mode, params):
         waveform = features['waveform']
         input_waveform = waveform[:, :-1, :]
         if params['conditioning']:
-            conditioning = tf.cast(features['conditioning'])
+            conditioning = features['conditioning']
             conditioning = tf.reshape(conditioning, [-1, 128])
             conditioning = tf.layers.dense(conditioning, 128)
             conditioning = tf.reshape(conditioning, [-1, 1, 128])
