@@ -11,7 +11,7 @@ audio:
   channels: 1
 
 classifier:
-  n_mels: 1
+  n_mels: 128
 
 synth:
   sample_augmentation: 4
