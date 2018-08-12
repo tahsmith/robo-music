@@ -6,7 +6,7 @@ import os
 import subprocess
 from collections import Counter
 
-allocation_re = re.compile(r' allocated (\d+) for tensor (.+)')
+allocation_re = re.compile(br' allocated (\d+) for tensor (.+)')
 
 
 def main(argv):
