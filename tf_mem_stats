@@ -38,7 +38,7 @@ def debug_process(proc):
 
         time, deallocation, size, tensor = match.groups()
         size = int(size)
-        tensor = tensor.encode()
+        tensor = tensor.decode()
         time = int(time)
         if deallocation:
             size = -size
