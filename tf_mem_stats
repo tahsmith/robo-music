@@ -19,7 +19,7 @@ def start_proc(args):
     environ['PYTHONUNBUFFERED'] = '1'
     environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
 
-    return subprocess.Popen(args, stderr=subprocess.PIPE)
+    return subprocess.Popen(args, env=environ, stderr=subprocess.PIPE)
 
 
 def debug_process(proc):
