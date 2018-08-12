@@ -29,6 +29,7 @@ def debug_process(proc):
     max_allocations = defaultdict(int)
     total_allocation = 0
     max_total_allocation = 0
+    max_allocations_snapshot = allocations.copy()
     max_time = 0
     for line in proc.stderr:
         match = allocation_re.search(line)
@@ -50,9 +51,10 @@ def debug_process(proc):
         total_allocation += size
         if max_total_allocation < total_allocation:
             max_total_allocation = total_allocation
+            max_allocations_snapshot = allocations.copy()
             max_time = time
 
-    return list((v, k) for k, v in max_allocations.items()), \
+    return list((v, k) for k, v in max_allocations_snapshot.items()), \
            max_total_allocation, max_time
 
 
