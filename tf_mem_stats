@@ -36,7 +36,6 @@ def debug_process(proc):
         match = allocation_re.search(line)
         if not match:
             continue
-        print(line)
 
         time, deallocation, size, tensor = match.groups()
         size = int(size)
