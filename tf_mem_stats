@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+import re
+import sys
+import os
+import subprocess
+
+allocation_re = re.compile(r'allocated (\d+) for tensor (\s+)')
+
+
+def main(argv):
+    proc = start_proc(argv[1:])
+    allocations = debug_process(proc)
+    print_stats(allocations)
+
+
+def start_proc(args):
+    environ = os.environ.copy()
+    environ['PYTHONUNBUFFERED'] = '1'
+    environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
+
+    return subprocess.Popen(args, stderr=subprocess.PIPE)
+
+
+def debug_process(proc):
+    allocations = []
+    for line in proc.stderr:
+        match = allocation_re.search(line)
+        if not match:
+            continue
+
+        size, tensor = match.groups()
+        allocations.append((int(size), tensor))
+    return allocations
+
+
+def print_stats(allocations):
+    top = sorted(allocations)[:10]
+    print(top)
+
+
+if __name__ == '__main__':
+    main(sys.argv)
