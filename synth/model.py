@@ -142,8 +142,10 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
         dilation_output = filter_ * gate
 
         layer_outputs = tf.layers.conv1d(dilation_output, filters, 1)
-        residual = layer_outputs + inputs[:, dilation:, :]
-        skip_outputs = tf.layers.conv1d(dilation_output, skip_filters, 1)
+        residual = tf.add(layer_outputs, inputs[:, dilation:, :],
+                          name='residual')
+        skip_outputs = tf.layers.conv1d(
+            dilation_output, skip_filters, 1, name='skip')
 
         return residual, skip_outputs
 
