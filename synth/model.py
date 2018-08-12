@@ -100,28 +100,27 @@ def model_fn(features, mode, params):
             reg_loss = tf.add_n([tf.nn.l2_loss(x) for x in trainable_vars])
             loss += regularisation * reg_loss
 
-        optimizer = tf.train.AdamOptimizer()
-        training_op = optimizer.minimize(loss,
-                                         tf.train.get_global_step())
+        if mode == tf.estimator.ModeKeys.EVAL:
+            eval_metric_ops = {
+                'accuracy': tf.metrics.accuracy(labels, predictions)
+            }
+            return tf.estimator.EstimatorSpec(
+                mode,
+                predictions,
+                loss,
+                eval_metric_ops=eval_metric_ops
+            )
 
         if mode == tf.estimator.ModeKeys.TRAIN:
+            optimizer = tf.train.AdamOptimizer()
+            training_op = optimizer.minimize(loss,
+                                             tf.train.get_global_step())
             return tf.estimator.EstimatorSpec(
                 mode,
                 predictions,
                 loss,
                 training_op
             )
-
-        eval_metric_ops = {
-            'accuracy': tf.metrics.accuracy(labels, predictions)
-        }
-
-        return tf.estimator.EstimatorSpec(
-            mode,
-            predictions,
-            loss,
-            eval_metric_ops=eval_metric_ops
-        )
 
 
 def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
