@@ -61,7 +61,7 @@ def debug_process(proc):
 def print_stats(allocations, max_total_allocation, max_time):
     print(f'max {max_total_allocation} at {max_time}')
 
-    top = sorted(allocations, reverse=True)[:100]
+    top = sorted(allocations, reverse=True)
     for size, tensor in top:
         print(f'{size} - {tensor}')
 
