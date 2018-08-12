@@ -55,17 +55,18 @@ def model_fn(features, mode, params):
         ]
         layers = []
 
-        for dilation in dilation_layers:
-            output, skip = conv_layer(output, conditioning, residual_filters,
-                                      conv_filters, skip_filters, dilation,
-                                      mode)
-            if dropout:
-                output = tf.layers.dropout(
-                    output,
-                    rate=dropout,
-                    training=mode == tf.estimator.ModeKeys.TRAIN
-                )
-            layers.append(skip)
+        for n, dilation in enumerate(dilation_layers):
+            with tf.name_scope(f'layer_{n}'):
+                output, skip = conv_layer(output, conditioning, residual_filters,
+                                          conv_filters, skip_filters, dilation,
+                                          mode)
+                if dropout:
+                    output = tf.layers.dropout(
+                        output,
+                        rate=dropout,
+                        training=mode == tf.estimator.ModeKeys.TRAIN
+                    )
+                layers.append(skip)
 
         output_width = input_width - sum(dilation_layers) - 1
         output = tf.add_n([layer[:, -output_width:, :] for layer in layers])
