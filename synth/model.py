@@ -14,7 +14,7 @@ def model_width(depth, count):
 
 
 def model_fn(features, mode, params):
-    with tf.variable_scope('synth'):
+    with tf.name_scope('synth'):
         waveform = features['waveform']
         input_waveform = waveform[:, :-1, :]
         if params['conditioning']:
