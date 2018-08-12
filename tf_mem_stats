@@ -6,13 +6,14 @@ import os
 import subprocess
 from collections import Counter, defaultdict
 
-allocation_re = re.compile(br'(de)?allocated (\d+) for tensor (.+)')
+allocation_re = re.compile(br'At time (\d+) (de)?allocated (\d+) for tensor'
+                           br' (.+)')
 
 
 def main(argv):
     proc = start_proc(argv[1:])
-    allocations = debug_process(proc)
-    print_stats(allocations)
+    stats = debug_process(proc)
+    print_stats(*stats)
 
 
 def start_proc(args):
@@ -28,14 +29,17 @@ def debug_process(proc):
     max_allocations = defaultdict(int)
     total_allocation = 0
     max_total_allocation = 0
+    max_time = 0
     for line in proc.stderr:
         match = allocation_re.search(line)
         if not match:
             continue
         print(line)
 
-        deallocation, size, tensor = match.groups()
+        time, deallocation, size, tensor = match.groups()
         size = int(size)
+        tensor = tensor.encode()
+        time = int(time)
         if deallocation:
             size = -size
         allocations[tensor] += size
@@ -44,12 +48,17 @@ def debug_process(proc):
         )
 
         total_allocation += size
-        max_total_allocation = max(total_allocation, max_total_allocation)
+        if max_total_allocation < total_allocation:
+            max_total_allocation = total_allocation
+            max_time = time
 
-    return list((v, k) for k, v in allocations.items())
+    return list((v, k) for k, v in max_allocations.items()), \
+           max_total_allocation, max_time
 
 
-def print_stats(allocations):
+def print_stats(allocations, max_total_allocation, max_time):
+    print(f'max {max_total_allocation} at {max_time}')
+
     top = sorted(allocations, reverse=True)[:100]
     for size, tensor in top:
         print(f'{size} - {tensor}')
