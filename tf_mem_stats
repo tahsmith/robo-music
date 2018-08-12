@@ -14,6 +14,7 @@ def main(argv):
     proc = start_proc(argv[1:])
     stats = debug_process(proc)
     print_stats(*stats)
+    proc.wait()
 
 
 def start_proc(args):
