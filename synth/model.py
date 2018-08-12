@@ -142,11 +142,15 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
 
         dilation_output = filter_ * gate
 
+        # TODO: is this necessary?
         layer_outputs = tf.layers.conv1d(dilation_output, filters, 1)
-        residual = tf.add(layer_outputs, inputs[:, dilation:, :],
-                          name='residual')
-        skip_outputs = tf.layers.conv1d(
-            dilation_output, skip_filters, 1, name='skip')
+
+        with tf.name_scope('residual'):
+            residual = layer_outputs + inputs[:, dilation:, :]
+
+        with tf.name_scope('skip'):
+            skip_outputs = tf.layers.conv1d(
+                dilation_output, skip_filters, 1)
 
         return residual, skip_outputs
 
