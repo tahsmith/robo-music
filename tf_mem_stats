@@ -4,8 +4,9 @@ import re
 import sys
 import os
 import subprocess
+from collections import Counter
 
-allocation_re = re.compile(r'allocated (\d+) for tensor (\s+)')
+allocation_re = re.compile(r' allocated (\d+) for tensor (.+)')
 
 
 def main(argv):
@@ -23,19 +24,19 @@ def start_proc(args):
 
 
 def debug_process(proc):
-    allocations = []
+    allocations = Counter()
     for line in proc.stderr:
         match = allocation_re.search(line)
         if not match:
             continue
 
         size, tensor = match.groups()
-        allocations.append((int(size), tensor))
-    return allocations
+        allocations[tensor] += int(size)
+    return list(allocations.items())
 
 
 def print_stats(allocations):
-    top = sorted(allocations)[:10]
+    top = sorted(allocations, reverse=True)[:100]
     print(top)
 
 
