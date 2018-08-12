@@ -32,12 +32,13 @@ def debug_process(proc):
 
         size, tensor = match.groups()
         allocations[tensor] += int(size)
-    return list(allocations.items())
+    return list((v, k) for k, v in allocations.items())
 
 
 def print_stats(allocations):
     top = sorted(allocations, reverse=True)[:100]
-    print(top)
+    for size, tensor in top:
+        print(f'{size} - {tensor}')
 
 
 if __name__ == '__main__':
