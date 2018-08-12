@@ -45,8 +45,9 @@ def model_fn(features, mode, params):
         input_width = tf.shape(input_waveform)[1]
         one_hot = tf.reshape(one_hot, [-1, input_width, quantisation])
 
-        output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
-                                  filters=residual_filters)
+        with tf.name_scope('input_reshape'):
+            output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
+                                      filters=residual_filters)
 
         dilation_layers = [
             2 ** i
