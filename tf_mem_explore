@@ -5,51 +5,29 @@ import sys
 from collections import Counter
 
 
-def calc_max_total(pattern, allocation_list):
-    max_total = 0
-    total = 0
-    max_time = 0
-
-    for allocation in allocation_list:
-        time, size, tensor = allocation
-        if pattern.match(tensor):
-            total += size
-
-            if total > max_total:
-                max_total = total
-                max_time = time
-
-    print(f'max {max_total} at {max_time}')
-
-
-def count(pattern, allocation_list):
-    matches = Counter()
-
-    for allocation in allocation_list:
-        time, size, tensor = allocation
-        if pattern.match(tensor):
-            matches[tensor] += 1
-
-    for size, tensor in sorted((v, k) for k, v in matches.items()):
-        print(f'{size}: {tensor}')
-
-
-actions = {
-    'max': calc_max_total,
-    'count': count
-}
-
-
 def main(argv):
     in_path = argv[1]
-    action = argv[2]
     pattern_str = argv[3]
     with open(in_path, 'rb') as file:
         allocation_list = pickle.load(file)
 
     pattern = re.compile(pattern_str)
+    count(pattern, allocation_list)
 
-    actions[action](pattern, allocation_list)
+
+def count(pattern, allocation_list):
+    matches = Counter()
+    total = 0
+
+    for allocation in allocation_list:
+        time, size, tensor = allocation
+        if pattern.match(tensor):
+            matches[tensor] += size
+            total += size
+
+    for size, tensor in sorted((v, k) for k, v in matches.items()):
+        print(f'{size}: {tensor}')
+        print(f'total: {total}')
 
 
 if __name__ == '__main__':
