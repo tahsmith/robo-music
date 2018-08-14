@@ -5,7 +5,9 @@ import sys
 
 
 def main(argv):
-    allocation_list = pickle.load(argv[1])
+    with open(argv[1], 'rb') as file:
+        allocation_list = pickle.load(file)
+
     pattern = re.compile(allocation_list)
 
     max_total = 0

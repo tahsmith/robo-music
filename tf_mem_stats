@@ -12,15 +12,17 @@ allocation_re = re.compile(br'At time (\d+) (de)?allocated (\d+) for tensor'
 
 def main(argv):
     if argv[1] == '-o':
-        file = argv[2]
+        out_path = argv[2]
         del argv[1:3]
     else:
-        file = 'stats.p'
+        out_path = 'stats.p'
 
     proc = start_proc(argv[1:])
     stats = debug_process(proc)
-    pickle.dump(stats, file)
     proc.wait()
+
+    with open(out_path, 'eb') as file:
+        pickle.dump(stats, file)
 
 
 def start_proc(args):
