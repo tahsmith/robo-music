@@ -18,19 +18,19 @@ synth:
   augmentation_noise: 0.02
   augmentation_scale_range: 1.2
   feature_window: 2048
-  slice_size: 25000
+  slice_size: 6000
   quantisation: 256
   prepare_batch_size: 100000
   batch_size: 2
-  steps: 50000
-  steps_per_eval: 5000
-  eval_steps: 100
+  steps: 1
+  steps_per_eval: 1
+  eval_steps: 1
   conditioning: false
-  regularisation: 0.0
+  regularisation: false
   dropout: false
   dilation_stack_depth: 10
-  dilation_stack_count: 6
-  conv_filters: 64
-  residual_filters: 64
-  skip_filters: 128
+  dilation_stack_count: 5
+  conv_filters: 32
+  residual_filters: 32
+  skip_filters: 512
   validation_file: './data/music/sample1.wav'
