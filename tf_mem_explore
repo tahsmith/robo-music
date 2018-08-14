@@ -8,7 +8,7 @@ def main(argv):
     with open(argv[1], 'rb') as file:
         allocation_list = pickle.load(file)
 
-    pattern = re.compile(allocation_list)
+    pattern = re.compile(argv[2])
 
     max_total = 0
     total = 0
