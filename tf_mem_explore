@@ -2,7 +2,7 @@
 import pickle
 import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 def main(argv):
@@ -16,16 +16,17 @@ def main(argv):
 
 
 def count(pattern, allocation_list):
-    matches = Counter()
+    allocs = defaultdict(int)
+    max_allocs = defaultdict(int)
     total = 0
 
     for allocation in allocation_list:
         time, size, tensor = allocation
         if pattern.match(tensor):
-            matches[tensor] += size
-            total += size
+            allocs[tensor] += size
+            max_allocs[tensor] = max(max_allocs[tensor], allocs[tensor])
 
-    for size, tensor in sorted((v, k) for k, v in matches.items()):
+    for size, tensor in sorted((v, k) for k, v in max_allocs.items()):
         print(f'{size}: {tensor}')
         print(f'total: {total}')
 
