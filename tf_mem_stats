@@ -21,7 +21,7 @@ def main(argv):
     stats = debug_process(proc)
     proc.wait()
 
-    with open(out_path, 'eb') as file:
+    with open(out_path, 'wb') as file:
         pickle.dump(stats, file)
 
 
