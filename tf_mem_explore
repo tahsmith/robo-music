@@ -12,12 +12,12 @@ def calc_max_total(pattern, allocation_list):
 
     for allocation in allocation_list:
         time, size, tensor = allocation
-        pattern.match(tensor)
-        total += size
+        if pattern.match(tensor):
+            total += size
 
-        if total > max_total:
-            max_total = total
-            max_time = time
+            if total > max_total:
+                max_total = total
+                max_time = time
 
     print(f'max {max_total} at {max_time}')
 
