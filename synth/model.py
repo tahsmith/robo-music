@@ -22,7 +22,6 @@ def model_fn(features, mode, params):
             conditioning = tf.reshape(conditioning, [-1, 128])
             conditioning = tf.layers.dense(conditioning, 128)
             conditioning = tf.reshape(conditioning, [-1, 1, 128])
-
         else:
             conditioning = None
 
