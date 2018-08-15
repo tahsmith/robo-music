@@ -69,7 +69,7 @@ def model_fn(features, mode, params):
                 layers.append(skip)
 
         output_width = input_width - sum(dilation_layers) - 1
-        output = tf.add_n([layer[:, -output_width:, :] for layer in layers])
+        output = sum([layer[:, -output_width:, :] for layer in layers])
 
         with tf.name_scope('fc_stack'):
             output = tf.nn.elu(output)
@@ -98,7 +98,7 @@ def model_fn(features, mode, params):
             trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
                                                'synth')
 
-            reg_loss = add([tf.nn.l2_loss(x) for x in trainable_vars])
+            reg_loss = sum([tf.nn.l2_loss(x) for x in trainable_vars])
             loss += regularisation * reg_loss
 
         if mode == tf.estimator.ModeKeys.EVAL:
