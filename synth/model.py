@@ -98,7 +98,7 @@ def model_fn(features, mode, params):
             trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
                                                'synth')
 
-            reg_loss = tf.add_n([tf.nn.l2_loss(x) for x in trainable_vars])
+            reg_loss = add([tf.nn.l2_loss(x) for x in trainable_vars])
             loss += regularisation * reg_loss
 
         if mode == tf.estimator.ModeKeys.EVAL:
