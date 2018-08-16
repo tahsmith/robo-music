@@ -14,7 +14,7 @@ def model_width(depth, count):
 
 
 def model_fn(features, mode, params):
-    with tf.name_scope('synth'):
+    with tf.variable_scope('synth'):
         waveform = features['waveform']
         input_waveform = waveform[:, :-1, :]
         if params['conditioning']:
@@ -44,7 +44,7 @@ def model_fn(features, mode, params):
         input_width = tf.shape(input_waveform)[1]
         one_hot = tf.reshape(one_hot, [-1, input_width, quantisation])
 
-        with tf.name_scope('input_reshape'):
+        with tf.variable_scope('input_reshape'):
             output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
                                       filters=residual_filters)
 
@@ -56,7 +56,7 @@ def model_fn(features, mode, params):
         layers = []
 
         for n, dilation in enumerate(dilation_layers):
-            with tf.name_scope(f'layer_{n}'):
+            with tf.variable_scope(f'layer_{n}'):
                 output, skip = conv_layer(output, conditioning, residual_filters,
                                           conv_filters, skip_filters, dilation,
                                           mode)
@@ -71,7 +71,7 @@ def model_fn(features, mode, params):
         output_width = input_width - sum(dilation_layers) - 1
         output = sum([layer[:, -output_width:, :] for layer in layers])
 
-        with tf.name_scope('fc_stack'):
+        with tf.variable_scope('fc_stack'):
             output = tf.nn.elu(output)
             output = tf.layers.conv1d(output, skip_filters, 1,
                                       activation=tf.nn.elu)
@@ -126,15 +126,15 @@ def model_fn(features, mode, params):
 
 def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
                skip_filters, dilation, mode):
-    with tf.name_scope('conv_layer'):
-        with tf.name_scope('filter'):
+    with tf.variable_scope('conv_layer'):
+        with tf.variable_scope('filter'):
             filter_ = conv1d(inputs, conv_filters, dilation)
             if conditioning_inputs is not None:
                 filter_ = add_conditioning(filter_, conditioning_inputs,
                                            filters)
             filter_ = tf.tanh(filter_)
 
-        with tf.name_scope('gate'):
+        with tf.variable_scope('gate'):
             gate = conv1d(inputs, conv_filters, dilation)
             if conditioning_inputs is not None:
                 gate = add_conditioning(gate, conditioning_inputs, filters)
@@ -145,10 +145,10 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
         # TODO: is this necessary?
         layer_outputs = tf.layers.conv1d(dilation_output, filters, 1)
 
-        with tf.name_scope('residual'):
+        with tf.variable_scope('residual'):
             residual = layer_outputs + inputs[:, dilation:, :]
 
-        with tf.name_scope('skip'):
+        with tf.variable_scope('skip'):
             skip_outputs = tf.layers.conv1d(
                 dilation_output, skip_filters, 1)
 
