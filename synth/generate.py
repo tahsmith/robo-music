@@ -43,7 +43,7 @@ def regenerate(model_path, conditioning_file_path, output_path, n_mels,
 
     waveform = regenerate_with_conditioning(model_path, waveform, quantisation,
                                             conditioning,
-                                            model_width(depth, count) + 100)
+                                            model_width(depth, count))
 
     print(conditioning.shape[0])
     print(waveform.shape[0])

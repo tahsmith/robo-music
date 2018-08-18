@@ -81,7 +81,6 @@ def model_fn(features, mode, params):
                 layers.append(skip)
 
         output_width = input_width - sum(dilation_layers) - 1
-        # output_width = tf.shape(output)[1]
         output = sum([layer[:, -output_width:, :] for layer in layers])
 
         with tf.variable_scope('fc_stack'):
