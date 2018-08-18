@@ -1,22 +1,33 @@
 import tensorflow as tf
+import attr
 
 
-def dilation_stack_width(depth, count):
-    return sum(
-            2 ** i
-            for _ in range(count)
-            for i in range(depth)
-        )
-
-
-def model_width(depth, count):
-    return dilation_stack_width(depth, count) + 1
+@attr.s
+class ModelParams:
+    slice_size = attr.ib()
+    channels = attr.ib()
+    dilation_stack_depth = attr.ib()
+    dilation_stack_count = attr.ib()
+    residual_filters = attr.ib()
+    conv_filters = attr.ib()
+    skip_filters = attr.ib()
+    quantisation = attr.ib()
+    regularisation = attr.ib()
+    dropout = attr.ib()
+    conditioning = attr.ib()
 
 
 def model_fn(features, mode, params):
+    if isinstance(params, ModelParams):
+        params = attr.asdict(params)
+
     with tf.variable_scope('synth'):
         waveform = features['waveform']
-        input_waveform = waveform[:, :-1, :]
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            input_waveform = waveform
+        else:
+            input_waveform = waveform[:, :-1, :]
+
         if params['conditioning']:
             conditioning = features['conditioning']
             conditioning = tf.reshape(conditioning, [-1, 128])
@@ -57,7 +68,8 @@ def model_fn(features, mode, params):
 
         for n, dilation in enumerate(dilation_layers):
             with tf.variable_scope(f'layer_{n}'):
-                output, skip = conv_layer(output, conditioning, residual_filters,
+                output, skip = conv_layer(output, conditioning,
+                                          residual_filters,
                                           conv_filters, skip_filters, dilation,
                                           mode)
                 if dropout:
@@ -69,6 +81,7 @@ def model_fn(features, mode, params):
                 layers.append(skip)
 
         output_width = input_width - sum(dilation_layers) - 1
+        # output_width = tf.shape(output)[1]
         output = sum([layer[:, -output_width:, :] for layer in layers])
 
         with tf.variable_scope('fc_stack'):
@@ -85,7 +98,7 @@ def model_fn(features, mode, params):
                 mode, predictions,
                 export_outputs={
                     'predict_output': tf.estimator.export.PredictOutput(
-                        {"predictions": predictions,
+                        {'predictions': predictions,
                          'probabilities': tf.nn.softmax(logits)})})
 
         n_predictions = tf.shape(logits)[1]
@@ -167,6 +180,18 @@ def conv1d(inputs, filters, dilation):
                             kernel_size=2,
                             dilation_rate=dilation,
                             padding='valid')
+
+
+def dilation_stack_width(depth, count):
+    return sum(
+        2 ** i
+        for _ in range(count)
+        for i in range(depth)
+    )
+
+
+def model_width(depth, count):
+    return dilation_stack_width(depth, count) + 2
 
 
 def params_from_config():
