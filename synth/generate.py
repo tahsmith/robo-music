@@ -85,7 +85,7 @@ def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
 
 def regenerate_with_conditioning(model_path, init_waveform, quantisation,
                                  conditioning, slice_size):
-    waveform = tf.get_variable('waveform', shape=[slice_size - 1, 1],
+    waveform = tf.get_variable('waveform', shape=[slice_size, 1],
                                dtype=tf.int32)
     conditioning_tf = tf.Variable(conditioning, dtype=tf.float32)
     limit = tf.get_variable('limit', shape=[], dtype=tf.int32)
