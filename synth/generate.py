@@ -95,7 +95,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
 
     def loop(i, waveform_):
         features = {
-            'waveform': waveform_[tf.newaxis, -slice_size + 1:, :],
+            'waveform': waveform_[tf.newaxis, -slice_size:, :],
             'conditioning': conditioning_tf[i:i + 1, :]
         }
 
@@ -125,21 +125,21 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     sess.run(tf.global_variables_initializer())
     new_saver.restore(sess, tf.train.latest_checkpoint(model_path))
 
-    initial_shape = (slice_size - 1, 1)
+    initial_shape = (slice_size, 1)
     output_waveform = np.ones(initial_shape, dtype=np.int32) * 256 // 2 \
                       + np.random.choice([0, 1], initial_shape)
     output_waveform[-1, 0] = np.random.randint(0, 255)
     # output_waveform = init_waveform[:slice_size - 1]
     for i in range(conditioning.shape[0] // 1000):
         sess.run(limit.assign(1000))
-        sess.run(waveform.assign(output_waveform[-(slice_size - 1):, :]))
+        sess.run(waveform.assign(output_waveform[-slice_size:, :]))
         while_op_result = sess.run(while_op)
         final_i, waveform_result = while_op_result
         output_waveform = np.concatenate(
-            (output_waveform, waveform_result[slice_size - 1:, :]))
+            (output_waveform, waveform_result[slice_size:, :]))
         print(f'{i * 1000}')
 
-    waveform_result = output_waveform[slice_size - 1:, :]
+    waveform_result = output_waveform[slice_size:, :]
     waveform_result = mu_law_decode(waveform_result, quantisation)
     waveform_result = normalise_to_int_range(waveform_result, np.int16)
     print(np.max(waveform_result))
