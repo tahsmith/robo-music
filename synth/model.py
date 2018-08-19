@@ -116,7 +116,9 @@ def model_fn(features, mode, params):
 
         if mode == tf.estimator.ModeKeys.EVAL:
             eval_metric_ops = {
-                'accuracy': tf.metrics.accuracy(labels, predictions)
+                'accuracy': tf.metrics.accuracy(labels, predictions),
+                'mean_absolute_error':
+                    tf.metrics.mean_absolute_error(labels, predictions)
             }
             return tf.estimator.EstimatorSpec(
                 mode,
