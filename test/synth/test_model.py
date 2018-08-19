@@ -3,7 +3,7 @@ import pytest
 import tensorflow as tf
 
 from synth.model import ModelParams, model_fn, model_width
-from synth.prepare import mu_law_encode
+from synth.prepare import mu_law_encode, mu_law_decode
 
 
 def make_test_inputs(slice_size, channel_size, batch_size,
@@ -56,12 +56,6 @@ def test_model_train():
     sample_rate = 44100
     time_length = 1
     n_points = sample_rate * time_length
-    t = np.arange(0, n_points) / sample_rate
-    freq = 440
-    sine_wave = np.sin(t * 2 * np.pi * t * freq)
-    sine_wave = sine_wave[np.newaxis, :, np.newaxis]
-    sine_wave = mu_law_encode(sine_wave, 256)
-    conditioning = np.random.randn(1, n_points, 256)
 
     params = ModelParams(
         slice_size=n_points,
@@ -77,10 +71,17 @@ def test_model_train():
         conditioning=False
     )
 
+    t = np.arange(0, n_points) / sample_rate
+    freq = 440
+    sine_wave = np.sin(t * 2 * np.pi * t * freq)
+    sine_wave = sine_wave[np.newaxis, :, np.newaxis]
+    sine_wave_encoded = mu_law_encode(sine_wave, params.quantisation)
+    conditioning = np.random.randn(1, n_points, 1)
+
     print(params.receptive_field)
 
     train_spec = model_fn(
-        {'waveform': tf.constant(sine_wave),
+        {'waveform': tf.constant(sine_wave_encoded),
          'conditioning': tf.constant(conditioning)},
         tf.estimator.ModeKeys.TRAIN,
         params
@@ -88,7 +89,7 @@ def test_model_train():
 
     with tf.variable_scope('', reuse=tf.AUTO_REUSE):
         predict_spec = model_fn(
-            {'waveform': tf.constant(sine_wave),
+            {'waveform': tf.constant(sine_wave_encoded),
              'conditioning': tf.constant(conditioning)},
             tf.estimator.ModeKeys.PREDICT,
             params
@@ -109,4 +110,9 @@ def test_model_train():
             )
 
         predictions = session.run(predict_spec.predictions)
-        assert np.all(np.abs(predictions[:-1] - sine_wave[1:]) < 0.01)
+        actual = mu_law_decode(predictions[0, :-1], params.quantisation)
+        expected = sine_wave[0, params.receptive_field:, 0]
+        accuracy = np.mean(np.abs(actual - expected))
+        # Channels are quantised as per mu_law_encode, assert that average error
+        # is less that the quantisation level, i.e, 1.
+        assert accuracy < 1.0
