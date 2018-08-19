@@ -1,26 +1,23 @@
 import tensorflow as tf
-import attr
+from attr import attrs, attrib
 
 
-@attr.s
+@attrs
 class ModelParams:
-    slice_size = attr.ib()
-    channels = attr.ib()
-    dilation_stack_depth = attr.ib()
-    dilation_stack_count = attr.ib()
-    residual_filters = attr.ib()
-    conv_filters = attr.ib()
-    skip_filters = attr.ib()
-    quantisation = attr.ib()
-    regularisation = attr.ib()
-    dropout = attr.ib()
-    conditioning = attr.ib()
+    slice_size = attrib()
+    channels = attrib()
+    dilation_stack_depth = attrib()
+    dilation_stack_count = attrib()
+    residual_filters = attrib()
+    conv_filters = attrib()
+    skip_filters = attrib()
+    quantisation = attrib()
+    regularisation = attrib()
+    dropout = attrib()
+    conditioning = attrib()
 
 
 def model_fn(features, mode, params):
-    if isinstance(params, ModelParams):
-        params = attr.asdict(params)
-
     with tf.variable_scope('synth'):
         waveform = features['waveform']
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -28,7 +25,7 @@ def model_fn(features, mode, params):
         else:
             input_waveform = waveform[:, :-1, :]
 
-        if params['conditioning']:
+        if params.conditioning:
             conditioning = features['conditioning']
             conditioning = tf.reshape(conditioning, [-1, 128])
             conditioning = tf.layers.dense(conditioning, 128)
@@ -36,15 +33,15 @@ def model_fn(features, mode, params):
         else:
             conditioning = None
 
-        channels = params['channels']
-        residual_filters = params['residual_filters']
-        conv_filters = params['conv_filters']
-        skip_filters = params['skip_filters']
-        quantisation = params['quantisation']
-        regularisation = params['regularisation']
-        dropout = params['dropout']
-        dilation_stack_depth = params['dilation_stack_depth']
-        dilation_stack_count = params['dilation_stack_count']
+        channels = params.channels
+        residual_filters = params.residual_filters
+        conv_filters = params.conv_filters
+        skip_filters = params.skip_filters
+        quantisation = params.quantisation
+        regularisation = params.regularisation
+        dropout = params.dropout
+        dilation_stack_depth = params.dilation_stack_depth
+        dilation_stack_count = params.dilation_stack_count
 
         assert channels == 1
         one_hot = tf.one_hot(
@@ -197,16 +194,18 @@ def params_from_config():
     from config import config_dict
     audio_config = config_dict['audio']
     synth_config = config_dict['synth']
-    return {
-        'slice_size': synth_config['slice_size'],
-        'channels': audio_config['channels'],
-        'dilation_stack_depth': synth_config['dilation_stack_depth'],
-        'dilation_stack_count': synth_config['dilation_stack_count'],
-        'residual_filters': synth_config['residual_filters'],
-        'conv_filters': synth_config['conv_filters'],
-        'skip_filters': synth_config['skip_filters'],
-        'quantisation': synth_config['quantisation'],
-        'regularisation': synth_config['regularisation'],
-        'dropout': synth_config['dropout'],
-        'conditioning': synth_config['conditioning']
-    }
+    return ModelParams(
+        slice_size=synth_config['slice_size'],
+        channels=audio_config['channels'],
+        dilation_stack_depth=synth_config[
+            'dilation_stack_depth'],
+        dilation_stack_count=synth_config[
+            'dilation_stack_count'],
+        residual_filters=synth_config['residual_filters'],
+        conv_filters=synth_config['conv_filters'],
+        skip_filters=synth_config['skip_filters'],
+        quantisation=synth_config['quantisation'],
+        regularisation=synth_config['regularisation'],
+        dropout=synth_config['dropout'],
+        conditioning=synth_config['conditioning']
+    )

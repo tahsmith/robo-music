@@ -5,8 +5,8 @@ import numpy as np
 import tensorflow as tf
 
 from audio import ffmpeg
-from synth.prepare import compute_features, clip_to_slice_size, \
-    normalise_waveform, quantise, mu_law_decode
+from synth.prepare import (compute_features, clip_to_slice_size,
+                           normalise_waveform, quantise, mu_law_decode)
 from synth.model import model_fn, params_from_config, model_width
 from utils import normalise_to_int_range
 
@@ -103,11 +103,16 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
                                   params_from_config())
 
         next_point = estimator_spec.predictions
-
-        waveform_ = tf.concat(
-            [waveform_, next_point[0, -1:, tf.newaxis]],
-            axis=0
+        next_point_shape = tf.shape(next_point)
+        assert_op = tf.Assert(
+            tf.reduce_all(next_point_shape[1] == tf.constant(1)),
+            [next_point, next_point_shape]
         )
+        with tf.control_dependencies([assert_op]):
+            waveform_ = tf.concat(
+                [waveform_, next_point[0, -1:, tf.newaxis]],
+                axis=0
+            )
 
         return [tf.add(i, 1), waveform_]
 
