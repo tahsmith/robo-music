@@ -89,7 +89,7 @@ def test_model_train():
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
 
-        for i in range(100):
+        for i in range(1000):
             train_value, loss_value = session.run([train_spec.train_op,
                                                    train_spec.loss])
             print(f'{loss_value}')
