@@ -127,9 +127,9 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     new_saver.restore(sess, tf.train.latest_checkpoint(model_path))
 
     initial_shape = (slice_size, 1)
-    output_waveform = np.ones(initial_shape, dtype=np.int32) * 256 // 2 \
-                      + np.random.choice([0, 1], initial_shape)
-    output_waveform[-1, 0] = np.random.randint(0, 255)
+    noise = 0.01
+    output_waveform = np.random.uniform(-noise, noise, initial_shape)
+    output_waveform[-1, 0] = np.random.uniform(-1, 1)
     output_waveform = mu_law_encode(output_waveform, params.quantisation)
     steps = 11025
     for i in range(conditioning.shape[0] // steps):
