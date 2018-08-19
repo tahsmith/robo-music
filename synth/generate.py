@@ -17,7 +17,7 @@ def main(argv):
     try:
         time = int(argv[2])
     except IndexError:
-        time = 2.0
+        time = 10.0
 
     from config import config_dict
     sample_rate = config_dict['audio']['sample_rate']
@@ -131,8 +131,9 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
                       + np.random.choice([0, 1], initial_shape)
     output_waveform[-1, 0] = np.random.randint(0, 255)
     output_waveform = mu_law_encode(output_waveform, params.quantisation)
+    steps = 11025
     for i in range(conditioning.shape[0] // 1000):
-        sess.run(limit.assign(1000))
+        sess.run(limit.assign(steps))
         sess.run(waveform.assign(output_waveform[-slice_size:, :]))
         while_op_result = sess.run(while_op)
         final_i, waveform_result = while_op_result
