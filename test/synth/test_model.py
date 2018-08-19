@@ -86,6 +86,14 @@ def test_model_train():
         params
     )
 
+    with tf.variable_scope('', reuse=tf.AUTO_REUSE):
+        predict_spec = model_fn(
+            {'waveform': tf.constant(sine_wave),
+             'conditioning': tf.constant(conditioning)},
+            tf.estimator.ModeKeys.PREDICT,
+            params
+        )
+
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
 
@@ -99,3 +107,6 @@ def test_model_train():
             raise AssertionError(
                 f'Training did not converge. Final loss: {loss_value}'
             )
+
+        predictions = session.run(predict_spec.predictions)
+        assert np.all(np.abs(predictions[:-1] - sine_wave[1:]) < 0.01)
