@@ -14,7 +14,7 @@ classifier:
   n_mels: 128
 
 synth:
-  sample_augmentation: 4
+  sample_augmentation: 8
   augmentation_noise: 0.02
   augmentation_scale_range: 1.2
   feature_window: 2048
