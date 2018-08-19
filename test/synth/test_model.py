@@ -1,7 +1,8 @@
-from synth.model import ModelParams, model_fn, model_width
-import tensorflow as tf
 import numpy as np
+import pytest
+import tensorflow as tf
 
+from synth.model import ModelParams, model_fn, model_width
 from synth.prepare import mu_law_encode
 
 
@@ -50,6 +51,7 @@ def test_model_width():
         assert predictions.shape[1] == 1
 
 
+@pytest.mark.skipif('not tf.test.is_gpu_available(cuda_only=True)')
 def test_model_train():
     sample_rate = 44100
     time_length = 1
@@ -64,7 +66,7 @@ def test_model_train():
     params = ModelParams(
         slice_size=n_points,
         channels=1,
-        dilation_stack_depth=2,
+        dilation_stack_depth=10,
         dilation_stack_count=2,
         residual_filters=8,
         conv_filters=8,
@@ -75,6 +77,8 @@ def test_model_train():
         conditioning=False
     )
 
+    print(params.receptive_field)
+
     train_spec = model_fn(
         {'waveform': tf.constant(sine_wave),
          'conditioning': tf.constant(conditioning)},
@@ -84,4 +88,14 @@ def test_model_train():
 
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
-        session.run(train_spec.train_op)
+
+        for i in range(100):
+            train_value, loss_value = session.run([train_spec.train_op,
+                                                   train_spec.loss])
+            print(f'{loss_value}')
+            if loss_value < 0.1:
+                break
+        else:
+            raise AssertionError(
+                f'Training did not converge. Final loss: {loss_value}'
+            )

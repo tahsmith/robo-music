@@ -16,6 +16,10 @@ class ModelParams:
     dropout = attrib()
     conditioning = attrib()
 
+    @property
+    def receptive_field(self):
+        return model_width(self.dilation_stack_depth, self.dilation_stack_count)
+
 
 def model_fn(features, mode, params):
     with tf.variable_scope('synth'):
