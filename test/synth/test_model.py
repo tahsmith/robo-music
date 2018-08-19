@@ -70,7 +70,7 @@ def test_model_train():
         dilation_stack_count=2,
         residual_filters=8,
         conv_filters=8,
-        skip_filters=16,
+        skip_filters=8,
         quantisation=256,
         regularisation=False,
         dropout=False,
@@ -89,10 +89,10 @@ def test_model_train():
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
 
-        for i in range(1000):
+        for i in range(2000):
             train_value, loss_value = session.run([train_spec.train_op,
                                                    train_spec.loss])
-            print(f'{loss_value}')
+            print(f'{i} - {loss_value}')
             if loss_value < 0.8:
                 break
         else:
