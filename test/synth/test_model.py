@@ -93,7 +93,7 @@ def test_model_train():
             train_value, loss_value = session.run([train_spec.train_op,
                                                    train_spec.loss])
             print(f'{loss_value}')
-            if loss_value < 0.1:
+            if loss_value < 0.8:
                 break
         else:
             raise AssertionError(
