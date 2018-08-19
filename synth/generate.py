@@ -139,7 +139,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
         final_i, waveform_result = while_op_result
         output_waveform = np.concatenate(
             (output_waveform, waveform_result[slice_size:, :]))
-        print(f'{i * steps}')
+        print(f'{(i + 1) * steps}')
 
     waveform_result = output_waveform[slice_size:, :]
     waveform_result = mu_law_decode(waveform_result, quantisation)
