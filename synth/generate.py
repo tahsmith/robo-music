@@ -6,7 +6,8 @@ import tensorflow as tf
 
 from audio import ffmpeg
 from synth.prepare import (compute_features, clip_to_slice_size,
-                           normalise_waveform, quantise, mu_law_decode)
+                           normalise_waveform, quantise, mu_law_decode,
+                           mu_law_encode)
 from synth.model import model_fn, params_from_config, model_width
 from utils import normalise_to_int_range
 
@@ -89,6 +90,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
                                dtype=tf.int32)
     conditioning_tf = tf.Variable(conditioning, dtype=tf.float32)
     limit = tf.get_variable('limit', shape=[], dtype=tf.int32)
+    params = params_from_config()
 
     def cond(i, _):
         return tf.less(i, limit)
@@ -100,19 +102,13 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
         }
 
         estimator_spec = model_fn(features, tf.estimator.ModeKeys.PREDICT,
-                                  params_from_config())
+                                  params)
 
         next_point = estimator_spec.predictions
-        next_point_shape = tf.shape(next_point)
-        assert_op = tf.Assert(
-            tf.reduce_all(next_point_shape[1] == tf.constant(1)),
-            [next_point, next_point_shape]
+        waveform_ = tf.concat(
+            [waveform_, next_point[0, -1:, tf.newaxis]],
+            axis=0
         )
-        with tf.control_dependencies([assert_op]):
-            waveform_ = tf.concat(
-                [waveform_, next_point[0, -1:, tf.newaxis]],
-                axis=0
-            )
 
         return [tf.add(i, 1), waveform_]
 
@@ -134,7 +130,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     output_waveform = np.ones(initial_shape, dtype=np.int32) * 256 // 2 \
                       + np.random.choice([0, 1], initial_shape)
     output_waveform[-1, 0] = np.random.randint(0, 255)
-    # output_waveform = init_waveform[:slice_size - 1]
+    output_waveform = mu_law_encode(output_waveform, params.quantisation)
     for i in range(conditioning.shape[0] // 1000):
         sess.run(limit.assign(1000))
         sess.run(waveform.assign(output_waveform[-slice_size:, :]))
