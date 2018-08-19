@@ -131,7 +131,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     output_waveform = np.random.uniform(-noise, noise, initial_shape)
     output_waveform[-1, 0] = np.random.uniform(-1, 1)
     output_waveform = mu_law_encode(output_waveform, params.quantisation)
-    steps = 1
+    steps = 11025
     for i in range(conditioning.shape[0] // steps):
         sess.run(limit.assign(steps))
         sess.run(waveform.assign(output_waveform[-slice_size:, :]))
