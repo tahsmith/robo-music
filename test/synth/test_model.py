@@ -66,7 +66,7 @@ def test_model_train():
     params = ModelParams(
         slice_size=n_points,
         channels=1,
-        dilation_stack_depth=10,
+        dilation_stack_depth=8,
         dilation_stack_count=2,
         residual_filters=8,
         conv_filters=8,
