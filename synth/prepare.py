@@ -10,6 +10,8 @@ from numpy import random
 import librosa
 import numpy as np
 
+from synth.model import params_from_config
+
 
 def save_array(x, filename):
     np.save(filename, x, allow_pickle=False)
@@ -120,7 +122,7 @@ def normalise_waveform(waveform, channels):
     return waveform
 
 
-def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
+def files_to_waveform_chunks(file_list, channels, chunk_size, receptive_field,
                              augmentation, noise, scale):
     chunk = np.zeros((0, channels))
     file_list = iter(enumerate(file_list))
@@ -133,8 +135,8 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, slice_size,
                 current_file_data = np.load(file)
                 current_file_data = pad_waveform(
                     current_file_data,
-                    slice_size // 2,
-                    slice_size // 2 + slice_size % 2,
+                    receptive_field - 1,
+                    0,
                     noise
                 )
                 current_file_data = augment(current_file_data, augmentation,
@@ -238,6 +240,8 @@ async def main():
     augmentation_noise = synth_config['augmentation_noise']
     augmentation_scale_range = synth_config['augmentation_scale_range']
 
+    model_params = params_from_config()
+
     cache_path = data_config['cache']
     input_files = list_input_files(cache_path)
     print(f'files: {input_files}')
@@ -250,7 +254,8 @@ async def main():
 
     def generate_waveforms():
         return files_to_waveform_chunks(input_files, channels, chunk_size,
-                                        slice_size, augmentation,
+                                        model_params.receptive_field,
+                                        augmentation,
                                         augmentation_noise,
                                         augmentation_scale_range)
 

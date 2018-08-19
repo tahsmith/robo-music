@@ -127,18 +127,18 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     new_saver.restore(sess, tf.train.latest_checkpoint(model_path))
 
     initial_shape = (slice_size, 1)
-    noise = 0.01
+    noise = 0.0
     output_waveform = np.random.uniform(-noise, noise, initial_shape)
     output_waveform[-1, 0] = np.random.uniform(-1, 1)
     output_waveform = mu_law_encode(output_waveform, params.quantisation)
-    steps = 11025
+    steps = 1
     for i in range(conditioning.shape[0] // steps):
         sess.run(limit.assign(steps))
         sess.run(waveform.assign(output_waveform[-slice_size:, :]))
         while_op_result = sess.run(while_op)
         final_i, waveform_result = while_op_result
-        output_waveform = np.concatenate(
-            (output_waveform, waveform_result[slice_size:, :]))
+        new_points = waveform_result[slice_size:, :]
+        output_waveform = np.concatenate((output_waveform, new_points))
         print(f'{(i + 1) * steps}')
 
     waveform_result = output_waveform[slice_size:, :]
