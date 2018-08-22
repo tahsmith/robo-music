@@ -3,12 +3,12 @@ import glob
 
 import sys
 from functools import partial
-from random import shuffle
 
 import tensorflow as tf
 import numpy as np
 
 from synth.model import params_from_config, ModelParams
+from synth.prepare import mu_law_encode, normalise_waveform
 from .model import model_fn
 from train_utils import train_and_test
 
@@ -50,29 +50,35 @@ def input_generator(waveform, feature, batch_size, params: ModelParams):
     channels = waveform.shape[1]
     n_features = feature.shape[1]
     while True:
-        waveform_batch = np.empty((params.slice_size, channels))
-        feature_batch = np.empty((params.slice_size, n_features))
+        waveform_batch = np.empty((batch_size, params.slice_size, channels))
+        feature_batch = np.empty((batch_size, params.slice_size, n_features))
         for i in range(batch_size):
-            start = np.random.uniform(0, max_index)
+            start = int(np.random.uniform(0, max_index))
             end = start + params.slice_size
-            waveform_batch[i, :] = augment_sample(
-                waveform[start:end, :],
-                0.01,
-                1.2
+            waveform_batch[i, :] = mu_law_encode(
+                normalise_waveform(
+                    augment_sample(
+                        waveform[start:end, :],
+                        0.01,
+                        1.2
+                    ),
+                    channels
+                ),
+                params.quantisation
             )
             feature_batch[i, :] = feature[start:end, :]
 
         yield {
             'waveform': waveform_batch,
-            'feature': feature_batch
+            'conditioning': feature_batch
         }
 
 
-def input_function_from_array(waveform, feature, slice_size, batch_size,
+def input_function_from_array(waveform, feature, params, batch_size,
                               prefetch):
     def input_fn():
         return tf.data.Dataset.from_generator(
-            partial(input_generator, waveform, feature, slice_size, batch_size),
+            partial(input_generator, waveform, feature, batch_size, params),
             {'waveform': tf.int32, 'conditioning': tf.float32}
         ).prefetch(prefetch).repeat()
 
@@ -124,7 +130,7 @@ def main(argv):
     train_input_fn = input_function_from_array(
         train_waveform,
         train_features,
-        params.slice_size,
+        params,
         batch_size,
         steps_per_evals,
     )
@@ -132,7 +138,7 @@ def main(argv):
     test_input_fn = input_function_from_array(
         test_waveform,
         test_features,
-        params.slice_size,
+        params,
         batch_size,
         steps_per_evals,
     )
