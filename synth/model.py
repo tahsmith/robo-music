@@ -15,6 +15,9 @@ class ModelParams:
     regularisation = attrib()
     dropout = attrib()
     conditioning = attrib()
+    sample_rate = attrib()
+    feature_window = attrib()
+    n_mels = attrib()
 
     @property
     def receptive_field(self):
@@ -213,5 +216,8 @@ def params_from_config():
         quantisation=synth_config['quantisation'],
         regularisation=synth_config['regularisation'],
         dropout=synth_config['dropout'],
-        conditioning=synth_config['conditioning']
+        conditioning=synth_config['conditioning'],
+        sample_rate=audio_config['sample_rate'],
+        feature_window=synth_config['feature_window'],
+        n_mels=128
     )

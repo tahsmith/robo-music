@@ -13,4 +13,13 @@ def preprocess_waveform(waveform):
     return waveform
 
 
+def waveform_to_slices(waveform, slice_size, slice_stride):
+    samples, channels = waveform.shape
+    slice_count = (samples - slice_size) // slice_stride + 1
+    slices = np.empty((slice_count, slice_size, channels))
+    for i in range(slice_count):
+        begin = i * slice_stride
+        end = begin + slice_size
+        slices[i, :, :] = waveform[begin:end, :]
 
+    return slices

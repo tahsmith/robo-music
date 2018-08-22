@@ -10,7 +10,8 @@ from numpy import random
 import librosa
 import numpy as np
 
-from synth.model import params_from_config
+from synth.model import params_from_config, ModelParams
+from audio.prep import waveform_to_slices
 
 
 def save_array(x, filename):
@@ -161,15 +162,16 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, receptive_field,
             break
 
 
-def waveform_to_samples(waveform, sample_rate, slice_size, feature_window,
-                        n_mels, quantisation):
-    waveform = clip_to_slice_size(slice_size, waveform)
-    features = compute_features(waveform, sample_rate, feature_window, n_mels)
+def waveform_to_samples(waveform, params: ModelParams):
+    waveform = clip_to_slice_size(params.slice_size, waveform)
+    features = compute_features(waveform, params.sample_rate,
+                                params.feature_window, params.n_mels)
 
-    waveform = quantise(waveform, quantisation)
+    waveform = quantise(waveform, params.quantisation)
 
-    waveform = waveform.reshape(-1, slice_size, waveform.shape[1])
-    features = features.reshape(-1, slice_size, n_mels)
+    stride = params.slice_size - params.receptive_field
+    waveform = waveform_to_slices(waveform, params.slice_size, stride)
+    features = waveform_to_slices(features, params.slice_size, stride)
 
     assert np.all(waveform <= 255)
     assert np.all(waveform >= 0)
@@ -208,13 +210,11 @@ def file_shuffle(file_count):
     save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
-async def make_batch(output_path, sample_rate, slice_size, feature_window,
-                     n_mels, quantisation, i, x):
+async def make_batch(output_path, params, i, x):
     slices, features = await asyncio.get_event_loop().run_in_executor(
         None,
         waveform_to_samples,
-        x, sample_rate, slice_size, feature_window, n_mels,
-        quantisation
+        x, params
     )
 
     save_array(slices, f'{output_path}/synth/waveform_{i}.npy')
@@ -264,8 +264,7 @@ async def main():
     except FileExistsError:
         pass
 
-    make_batch_part = partial(make_batch, cache_path, sample_rate,
-                              slice_size, feature_window, n_mels, quantisation)
+    make_batch_part = partial(make_batch, cache_path, model_params)
     executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
     loop = asyncio.get_event_loop()
     loop.set_default_executor(executor)
