@@ -8,7 +8,7 @@ from random import shuffle
 import tensorflow as tf
 import numpy as np
 
-from synth.model import params_from_config
+from synth.model import params_from_config, ModelParams
 from .model import model_fn
 from train_utils import train_and_test
 
@@ -34,27 +34,45 @@ def baseline_model(conditioning_features, quantisation, model_dir):
     ).model_fn
 
 
-def input_generator(waveform_files, feature_files, batch_size):
-    pairs = list(zip(waveform_files, feature_files))
-    shuffle(pairs)
-    for waveform_file, feature_file in pairs:
-        waveform = np.load(waveform_file)
-        features = np.load(feature_file)
+def augment_sample(sample, noise_level=0.0, scale_range=1.0):
+    sample = sample.astype(np.float32)
+    scale = scale_range ** np.random.uniform(-1.0, 1.0)
+    noise = np.random.randn(*sample.shape) * noise_level
 
-        for i in range(waveform.shape[0] // batch_size):
-            begin = i * batch_size
-            end = begin + batch_size
-            yield {
-                'waveform': waveform[begin:end, :, :],
-                'conditioning': features[begin:end, :]
-            }
+    sample *= scale
+    sample += noise
+
+    return sample
 
 
-def input_function_from_file(waveform_files, feature_files, batch_size,
-                             prefetch):
+def input_generator(waveform, feature, batch_size, params: ModelParams):
+    max_index = waveform.shape[0] - params.slice_size
+    channels = waveform.shape[1]
+    n_features = feature.shape[1]
+    while True:
+        waveform_batch = np.empty((params.slice_size, channels))
+        feature_batch = np.empty((params.slice_size, n_features))
+        for i in range(batch_size):
+            start = np.random.uniform(0, max_index)
+            end = start + params.slice_size
+            waveform_batch[i, :] = augment_sample(
+                waveform[start:end, :],
+                0.01,
+                1.2
+            )
+            feature_batch[i, :] = feature[start:end, :]
+
+        yield {
+            'waveform': waveform_batch,
+            'feature': feature_batch
+        }
+
+
+def input_function_from_array(waveform, feature, slice_size, batch_size,
+                              prefetch):
     def input_fn():
         return tf.data.Dataset.from_generator(
-            partial(input_generator, waveform_files, feature_files, batch_size),
+            partial(input_generator, waveform, feature, slice_size, batch_size),
             {'waveform': tf.int32, 'conditioning': tf.float32}
         ).prefetch(prefetch).repeat()
 
@@ -81,31 +99,42 @@ def main(argv):
         params=params_from_config()
     )
 
+    params = params_from_config()
+
+    train_waveform = np.load(
+        f"{config_dict['data']['cache']}/synth/waveform_train.npy"
+    )
+
+    train_features = np.load(
+        f"{config_dict['data']['cache']}/synth/features_train.npy"
+    )
+
+    test_waveform = np.load(
+        f"{config_dict['data']['cache']}/synth/waveform_test.npy"
+    )
+
+    test_features = np.load(
+        f"{config_dict['data']['cache']}/synth/features_test.npy"
+    )
+
     batch_size = synth_config['batch_size']
-
-    waveform_files = glob.glob(
-        f"{config_dict['data']['cache']}/synth/waveform*.npy")
-
-    feature_files = glob.glob(
-        f"{config_dict['data']['cache']}/synth/features*.npy")
-
-    n_files = len(waveform_files)
-    train_cut = 90 * n_files // 100
     steps_per_evals = synth_config['steps_per_eval']
     evals_steps = synth_config['eval_steps']
 
-    train_input_fn = input_function_from_file(
-        waveform_files[:train_cut],
-        feature_files[:train_cut],
+    train_input_fn = input_function_from_array(
+        train_waveform,
+        train_features,
+        params.slice_size,
         batch_size,
-        steps_per_evals
+        steps_per_evals,
     )
 
-    test_input_fn = input_function_from_file(
-        waveform_files[train_cut:],
-        feature_files[train_cut:],
+    test_input_fn = input_function_from_array(
+        test_waveform,
+        test_features,
+        params.slice_size,
         batch_size,
-        evals_steps
+        steps_per_evals,
     )
 
     train_and_test(estimator, train_input_fn, test_input_fn,

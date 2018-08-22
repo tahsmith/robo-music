@@ -49,19 +49,19 @@ def quantise(x, quantisation):
     return mu_law_encode(x, quantisation)
 
 
-def compute_features(waveform, sample_rate, feature_window, n_mels):
-    waveform_padded = pad_waveform(waveform, feature_window - 1, 0, 0)
+def compute_features(waveform, params):
+    waveform_padded = pad_waveform(waveform, params.feature_window - 1, 0, 0)
 
     if waveform_padded.shape[1] == 1:
         waveform_padded = waveform_padded.reshape((-1))
     spec = np.abs(
-        librosa.stft(waveform_padded, n_fft=feature_window, hop_length=1,
+        librosa.stft(waveform_padded, n_fft=params.feature_window, hop_length=1,
                      center=False)) ** 2
     spec = librosa.feature.melspectrogram(
         waveform,
-        sample_rate,
+        params.sample_rate,
         S=spec,
-        n_mels=n_mels
+        n_mels=params.n_mels
     )
     spec = librosa.power_to_db(spec)
 
@@ -227,58 +227,69 @@ async def make_batch(output_path, params, i, x):
 async def main():
     from config import config_dict
     synth_config = config_dict['synth']
-    audio_config = config_dict['audio']
     data_config = config_dict['data']
 
-    feature_window = synth_config['feature_window']
-    slice_size = synth_config['slice_size']
-    quantisation = synth_config['quantisation']
-    channels = audio_config['channels']
-    sample_rate = audio_config['sample_rate']
-    n_mels = config_dict['classifier']['n_mels']
-    augmentation = synth_config['sample_augmentation']
-    augmentation_noise = synth_config['augmentation_noise']
-    augmentation_scale_range = synth_config['augmentation_scale_range']
-
-    model_params = params_from_config()
+    params = params_from_config()
 
     cache_path = data_config['cache']
     input_files = list_input_files(cache_path)
     print(f'files: {input_files}')
     shuffle(input_files)
 
-    chunk_size = synth_config['prepare_batch_size']  # 400000 is the max. This
-    # value comes from librosa.stft
-
-    chunk_size = chunk_size - chunk_size % slice_size
-
-    def generate_waveforms():
-        return files_to_waveform_chunks(input_files, channels, chunk_size,
-                                        model_params.receptive_field,
-                                        augmentation,
-                                        augmentation_noise,
-                                        augmentation_scale_range)
-
     try:
         os.makedirs(f'{cache_path}/synth/', exist_ok=True)
     except FileExistsError:
         pass
 
-    make_batch_part = partial(make_batch, cache_path, model_params)
-    executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
-    loop = asyncio.get_event_loop()
-    loop.set_default_executor(executor)
+    cpus = int(config_dict['sys']['cpus'])
+    executor = ProcessPoolExecutor(cpus)
+    waveforms = list(executor.map(np.load, input_files))
 
-    processed = asyncio.gather(*(
-        make_batch_part(i, x)
-        for i, x in enumerate(generate_waveforms())
-    ))
+    all_waveforms = np.concatenate(waveforms, axis=0)
+    n_samples = all_waveforms.shape[0]
 
-    n_samples = sum(await processed)
+    # 400000 is the max. This value comes from librosa.stft
+    max_split = min((n_samples + params.receptive_field) // cpus, 400000)
+    if n_samples > max_split:
+        split = n_samples - n_samples % max_split
+        head = all_waveforms[:split, :]
+        tail = all_waveforms[split:, :]
+        chunks = np.split(head, n_samples // max_split)
+        if tail.shape[0] > 0:
+            chunks.append(tail)
+    else:
+        chunks = [all_waveforms]
+
+    random.shuffle(chunks)
+    chunks = list(executor.map(partial(pad_waveform,
+                                       left_pad=params.receptive_field,
+                                       right_pad=0,
+                                       noise=0), chunks))
+    features = list(executor.map(partial(compute_features, params=params),
+                                 chunks))
+
+    n_samples = all_waveforms.shape[0]
+    all_waveforms = np.concatenate(chunks, axis=0)
+    all_features = np.concatenate(features)
+
+    assert all_waveforms.shape[0] == all_features.shape[0]
+
+    train_split = 90 * n_samples // 100
+    train_waveform = all_waveforms[:train_split, :]
+    train_features = all_features[:train_split, :]
+    test_waveform = all_waveforms[train_split:, :]
+    test_features = all_features[train_split:, :]
+
+    save_array(train_waveform, f'{cache_path}/synth/waveform_train.npy')
+    save_array(train_features, f'{cache_path}/synth/features_train.npy')
+
+    save_array(test_waveform, f'{cache_path}/synth/waveform_test.npy')
+    save_array(test_features, f'{cache_path}/synth/features_test.npy')
 
     print("Summary:")
-    print('features  {}'.format(n_mels))
-    print('samples   {}'.format(n_samples))
+    print(params)
+    print('test samples  {}'.format(test_waveform.shape[0]))
+    print('train samples {}'.format(train_waveform.shape[0]))
 
 
 if __name__ == '__main__':
