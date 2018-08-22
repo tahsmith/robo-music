@@ -132,7 +132,7 @@ def main(argv):
         train_features,
         params,
         batch_size,
-        steps_per_evals,
+        10,
     )
 
     test_input_fn = input_function_from_array(
@@ -140,7 +140,7 @@ def main(argv):
         test_features,
         params,
         batch_size,
-        steps_per_evals,
+        10,
     )
 
     train_and_test(estimator, train_input_fn, test_input_fn,
