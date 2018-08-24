@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-
+echo HOME=${HOME}
 pyenv install -s 3.6.4
 pyenv local 3.6.4
 python -m venv venv
