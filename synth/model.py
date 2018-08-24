@@ -170,7 +170,11 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
             skip_outputs = tf.layers.conv1d(
                 dilation_output, skip_filters, 1)
 
-        reduced_conditioning = conditioning_inputs[:, dilation:, :]
+        if conditioning_inputs is not None:
+            reduced_conditioning = conditioning_inputs[:, dilation:, :]
+        else:
+            reduced_conditioning = None
+
         return residual, skip_outputs, reduced_conditioning
 
 
