@@ -7,7 +7,7 @@ if command -v pyenv 1>/dev/null 2>&1; then
   eval "$(pyenv init -)"
 fi
 
-pyenv install 3.6.4
+pyenv install -s 3.6.4
 pyenv local 3.6.4
 python -m venv venv
 source venv/bin/activate
