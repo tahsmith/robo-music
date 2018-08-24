@@ -6,6 +6,13 @@ from synth.model import ModelParams, model_fn, model_width
 from synth.prepare import mu_law_encode, mu_law_decode
 
 
+@pytest.fixture
+def sess():
+    graph = tf.Graph()
+    with tf.Session(graph=graph) as sess:
+        yield sess
+
+
 def make_test_inputs(slice_size, channel_size, batch_size,
                      conditioning_features):
     return {
@@ -20,7 +27,7 @@ def make_test_inputs(slice_size, channel_size, batch_size,
     }
 
 
-def test_model_width():
+def test_model_width(sess):
     params = ModelParams(
         slice_size=1,
         channels=1,
@@ -32,7 +39,10 @@ def test_model_width():
         quantisation=256,
         regularisation=False,
         dropout=False,
-        conditioning=False
+        conditioning=False,
+        sample_rate=11025,
+        feature_window=2048,
+        n_mels=128
     )
 
     params.slice_size = model_width(params.dilation_stack_depth,
@@ -45,14 +55,48 @@ def test_model_width():
         tf.estimator.ModeKeys.PREDICT,
         params
     )
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        predictions = sess.run(model.predictions)
-        assert predictions.shape[1] == 1
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
+
+
+def test_conditioning(sess):
+    params = ModelParams(
+        slice_size=1,
+        channels=1,
+        dilation_stack_depth=10,
+        dilation_stack_count=5,
+        residual_filters=32,
+        conv_filters=32,
+        skip_filters=512,
+        quantisation=256,
+        regularisation=False,
+        dropout=False,
+        conditioning=True,
+        sample_rate=11025,
+        feature_window=2048,
+        n_mels=128
+    )
+
+    params.slice_size = model_width(params.dilation_stack_depth,
+                                    params.dilation_stack_count)
+
+    features = make_test_inputs(params.slice_size, params.channels, 2,
+                                params.n_mels)
+    model = model_fn(
+        features,
+        tf.estimator.ModeKeys.PREDICT,
+        params
+    )
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
 
 
 @pytest.mark.skipif('not tf.test.is_gpu_available(cuda_only=True)')
-def test_model_train():
+def test_model_train(sess):
     sample_rate = 44100
     time_length = 1
     n_points = sample_rate * time_length
@@ -68,7 +112,10 @@ def test_model_train():
         quantisation=256,
         regularisation=False,
         dropout=False,
-        conditioning=False
+        conditioning=False,
+        sample_rate=11025,
+        feature_window=2048,
+        n_mels=128
     )
 
     t = np.arange(0, n_points) / sample_rate
@@ -95,24 +142,23 @@ def test_model_train():
             params
         )
 
-    with tf.Session() as session:
-        session.run(tf.global_variables_initializer())
+    sess.run(tf.global_variables_initializer())
 
-        for i in range(2000):
-            train_value, loss_value = session.run([train_spec.train_op,
-                                                   train_spec.loss])
-            print(f'{i} - {loss_value}')
-            if loss_value < 0.8:
-                break
-        else:
-            raise AssertionError(
-                f'Training did not converge. Final loss: {loss_value}'
-            )
+    for i in range(2000):
+        train_value, loss_value = sess.run([train_spec.train_op,
+                                            train_spec.loss])
+        print(f'{i} - {loss_value}')
+        if loss_value < 0.8:
+            break
+    else:
+        raise AssertionError(
+            f'Training did not converge. Final loss: {loss_value}'
+        )
 
-        predictions = session.run(predict_spec.predictions)
-        actual = mu_law_decode(predictions[0, :-1], params.quantisation)
-        expected = sine_wave[0, params.receptive_field:, 0]
-        accuracy = np.mean(np.abs(actual - expected))
-        # Channels are quantised as per mu_law_encode, assert that average error
-        # is less that the quantisation level, i.e, 1.
-        assert accuracy < 1.0
+    predictions = sess.run(predict_spec.predictions)
+    actual = mu_law_decode(predictions[0, :-1], params.quantisation)
+    expected = sine_wave[0, params.receptive_field:, 0]
+    accuracy = np.mean(np.abs(actual - expected))
+    # Channels are quantised as per mu_law_encode, assert that average error
+    # is less that the quantisation level, i.e, 1.
+    assert accuracy < 1.0

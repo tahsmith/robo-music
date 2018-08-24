@@ -34,9 +34,6 @@ def model_fn(features, mode, params):
 
         if params.conditioning:
             conditioning = features['conditioning']
-            conditioning = tf.reshape(conditioning, [-1, 128])
-            conditioning = tf.layers.dense(conditioning, 128)
-            conditioning = tf.reshape(conditioning, [-1, 1, 128])
         else:
             conditioning = None
 
@@ -62,6 +59,8 @@ def model_fn(features, mode, params):
         with tf.variable_scope('input_reshape'):
             output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
                                       filters=residual_filters)
+            if conditioning is not None:
+                conditioning = conditioning[:, 1:, :]
 
         dilation_layers = [
             2 ** i
@@ -72,10 +71,11 @@ def model_fn(features, mode, params):
 
         for n, dilation in enumerate(dilation_layers):
             with tf.variable_scope(f'layer_{n}'):
-                output, skip = conv_layer(output, conditioning,
-                                          residual_filters,
-                                          conv_filters, skip_filters, dilation,
-                                          mode)
+                output, skip, conditioning = conv_layer(output, conditioning,
+                                                        residual_filters,
+                                                        conv_filters,
+                                                        skip_filters, dilation,
+                                                        mode)
                 if dropout:
                     output = tf.layers.dropout(
                         output,
@@ -149,13 +149,13 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
             filter_ = conv1d(inputs, conv_filters, dilation)
             if conditioning_inputs is not None:
                 filter_ = add_conditioning(filter_, conditioning_inputs,
-                                           filters)
+                                           filters, dilation)
             filter_ = tf.tanh(filter_)
 
         with tf.variable_scope('gate'):
             gate = conv1d(inputs, conv_filters, dilation)
             if conditioning_inputs is not None:
-                gate = add_conditioning(gate, conditioning_inputs, filters)
+                gate = add_conditioning(gate, conditioning_inputs, filters, dilation)
             gate = tf.sigmoid(gate)
 
         dilation_output = filter_ * gate
@@ -170,12 +170,14 @@ def conv_layer(inputs, conditioning_inputs, filters, conv_filters,
             skip_outputs = tf.layers.conv1d(
                 dilation_output, skip_filters, 1)
 
-        return residual, skip_outputs
+        reduced_conditioning = conditioning_inputs[:, dilation:, :]
+        return residual, skip_outputs, reduced_conditioning
 
 
-def add_conditioning(inputs, conditioning, filters):
-    conditioning_layer = tf.layers.dense(conditioning, filters)
-    outputs = inputs + conditioning_layer
+def add_conditioning(inputs, conditioning, filters, dilation):
+    with tf.variable_scope('conditioning_conv'):
+        conditioning_layer = conv1d(conditioning, filters, dilation)
+        outputs = inputs + conditioning_layer
     return outputs
 
 
