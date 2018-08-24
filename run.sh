@@ -1,5 +1,5 @@
-#!/usr/bin/env sh
-
+#!/usr/bin/env bash
+set -e
 pyenv local 3.6.4
 python -m venv venv
 source venv/bin/activate
