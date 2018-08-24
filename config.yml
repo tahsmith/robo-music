@@ -32,5 +32,5 @@ synth:
   dilation_stack_count: 5
   conv_filters: 32
   residual_filters: 32
-  skip_filters: 512
+  skip_filters: 32
   validation_file: './data/music/sample1.wav'
