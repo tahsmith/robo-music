@@ -101,6 +101,7 @@ def test_model_shape_predict(sess, params):
 
 
 def test_conditioning_shape_train(sess, params):
+    params.conditioning = True
     features = make_train_inputs(params)
     model = model_fn(
         features,
@@ -114,6 +115,7 @@ def test_conditioning_shape_train(sess, params):
 
 
 def test_conditioning_shape_eval(sess, params):
+    params.conditioning = True
     features = make_train_inputs(params)
     model = model_fn(
         features,
@@ -127,6 +129,7 @@ def test_conditioning_shape_eval(sess, params):
 
 
 def test_conditioning_shape_predict(sess, params):
+    params.conditioning = True
     features = make_predict_inputs(params)
     model = model_fn(
         features,
