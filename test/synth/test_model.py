@@ -133,7 +133,6 @@ def test_model_train(sess, params):
     sample_rate = 44100
     time_length = 1
     n_points = sample_rate * time_length
-    params.slice_size = n_points
 
     t = np.arange(0, n_points) / sample_rate
     freq = 440

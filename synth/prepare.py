@@ -164,16 +164,16 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, receptive_field,
             break
 
 
-def waveform_to_samples(waveform, params: ModelParams):
-    waveform = clip_to_slice_size(params.slice_size, waveform)
+def waveform_to_samples(waveform, slice_size, params: ModelParams):
+    waveform = clip_to_slice_size(slice_size, waveform)
     features = compute_features(waveform, params.sample_rate,
                                 params.feature_window, params.n_mels)
 
     waveform = quantise(waveform, params.quantisation)
 
-    stride = params.slice_size
-    waveform = waveform_to_slices(waveform, params.slice_size, stride)
-    features = waveform_to_slices(features, params.slice_size, stride)
+    stride = slice_size
+    waveform = waveform_to_slices(waveform, slice_size, stride)
+    features = waveform_to_slices(features, slice_size, stride)
 
     assert np.all(waveform <= 255)
     assert np.all(waveform >= 0)
