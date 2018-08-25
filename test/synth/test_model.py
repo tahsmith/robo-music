@@ -13,21 +13,8 @@ def sess():
         yield sess
 
 
-def make_test_inputs(slice_size, channel_size, batch_size,
-                     conditioning_features):
-    return {
-        'waveform': tf.constant(
-            np.zeros((batch_size, slice_size, channel_size)),
-            tf.int32
-        ),
-        'conditioning': tf.constant(
-            np.zeros((batch_size, slice_size, conditioning_features)),
-            tf.float32
-        )
-    }
-
-
-def test_model_width(sess):
+@pytest.fixture
+def params():
     params = ModelParams(
         slice_size=1,
         channels=1,
@@ -47,43 +34,35 @@ def test_model_width(sess):
 
     params.slice_size = model_width(params.dilation_stack_depth,
                                     params.dilation_stack_count)
-    print(params.slice_size)
 
-    features = make_test_inputs(params.slice_size, params.channels, 2, 1)
-    model = model_fn(
-        features,
-        tf.estimator.ModeKeys.PREDICT,
-        params
-    )
-
-    sess.run(tf.global_variables_initializer())
-    predictions = sess.run(model.predictions)
-    assert predictions.shape[1] == 1
+    return params
 
 
-def test_conditioning(sess):
-    params = ModelParams(
-        slice_size=1,
-        channels=1,
-        dilation_stack_depth=10,
-        dilation_stack_count=5,
-        residual_filters=32,
-        conv_filters=32,
-        skip_filters=512,
-        quantisation=256,
-        regularisation=False,
-        dropout=False,
-        conditioning=True,
-        sample_rate=11025,
-        feature_window=2048,
-        n_mels=128
-    )
+def make_train_inputs(params):
+    size = params.slice_size + 1
+    return make_inputs(params, size)
 
-    params.slice_size = model_width(params.dilation_stack_depth,
-                                    params.dilation_stack_count)
 
-    features = make_test_inputs(params.slice_size, params.channels, 2,
-                                params.n_mels)
+def make_predict_inputs(params):
+    size = params.slice_size
+    return make_inputs(params, size)
+
+
+def make_inputs(params, size):
+    return {
+        'waveform': tf.constant(
+            np.zeros((2, size, params.channels)),
+            tf.int32
+        ),
+        'conditioning': tf.constant(
+            np.zeros((2, size, params.n_mels)),
+            tf.float32
+        )
+    }
+
+
+def test_model_shape_train(sess, params):
+    features = make_train_inputs(params)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.TRAIN,
@@ -95,28 +74,77 @@ def test_conditioning(sess):
     assert predictions.shape[1] == 1
 
 
+def test_model_shape_eval(sess, params):
+    features = make_train_inputs(params)
+    model = model_fn(
+        features,
+        tf.estimator.ModeKeys.EVAL,
+        params
+    )
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
+
+
+def test_model_shape_predict(sess, params):
+    features = make_predict_inputs(params)
+    model = model_fn(
+        features,
+        tf.estimator.ModeKeys.PREDICT,
+        params
+    )
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
+
+
+def test_conditioning_shape_train(sess, params):
+    features = make_train_inputs(params)
+    model = model_fn(
+        features,
+        tf.estimator.ModeKeys.TRAIN,
+        params
+    )
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
+
+
+def test_conditioning_shape_eval(sess, params):
+    features = make_train_inputs(params)
+    model = model_fn(
+        features,
+        tf.estimator.ModeKeys.EVAL,
+        params
+    )
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
+
+
+def test_conditioning_shape_predict(sess, params):
+    features = make_predict_inputs(params)
+    model = model_fn(
+        features,
+        tf.estimator.ModeKeys.PREDICT,
+        params
+    )
+
+    sess.run(tf.global_variables_initializer())
+    predictions = sess.run(model.predictions)
+    assert predictions.shape[1] == 1
+
+
 @pytest.mark.skipif('not tf.test.is_gpu_available(cuda_only=True)')
-def test_model_train(sess):
+def test_model_train(sess, params):
     sample_rate = 44100
     time_length = 1
     n_points = sample_rate * time_length
-
-    params = ModelParams(
-        slice_size=n_points,
-        channels=1,
-        dilation_stack_depth=8,
-        dilation_stack_count=2,
-        residual_filters=8,
-        conv_filters=8,
-        skip_filters=8,
-        quantisation=256,
-        regularisation=False,
-        dropout=False,
-        conditioning=False,
-        sample_rate=11025,
-        feature_window=2048,
-        n_mels=128
-    )
+    params.slice_size = n_points
 
     t = np.arange(0, n_points) / sample_rate
     freq = 440
