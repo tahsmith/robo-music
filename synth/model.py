@@ -130,16 +130,17 @@ def add_regularisation(loss, params):
 def init_features(features, mode, params: ModelParams):
     waveform = features['waveform']
     if mode == tf.estimator.ModeKeys.PREDICT:
+        out_size = params.slice_size
         input_waveform = waveform
     else:
+        out_size = params.slice_size - 1
         input_waveform = waveform[:, :-1, :]
+    input_waveform = tf.reshape(input_waveform, (-1, out_size, params.channels))
 
     if params.conditioning:
         if mode == tf.estimator.ModeKeys.PREDICT:
-            out_size = params.slice_size
             conditioning = features['conditioning']
         else:
-            out_size = params.slice_size - 1
             conditioning = features['conditioning'][:, :-1, :]
         conditioning = tf.reshape(conditioning, (-1,
                                                  out_size, params.n_mels))
