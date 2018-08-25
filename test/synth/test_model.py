@@ -16,7 +16,6 @@ def sess():
 @pytest.fixture
 def params():
     params = ModelParams(
-        slice_size=1,
         channels=1,
         dilation_stack_depth=2,
         dilation_stack_count=2,
@@ -32,28 +31,24 @@ def params():
         n_mels=128
     )
 
-    params.slice_size = model_width(params.dilation_stack_depth,
-                                    params.dilation_stack_count)
-
     return params
 
 
-def make_inputs(params):
+def make_inputs(params, slice_size):
     return {
         'waveform': tf.constant(
-            np.zeros((2, params.slice_size, params.channels)),
+            np.zeros((2, slice_size, params.channels)),
             tf.int32
         ),
         'conditioning': tf.constant(
-            np.zeros((2, params.slice_size, params.n_mels)),
+            np.zeros((2, slice_size, params.n_mels)),
             tf.float32
         )
     }
 
 
 def test_model_shape_train(sess, params):
-    params.slice_size += 1
-    features = make_inputs(params)
+    features = make_inputs(params, params.receptive_field + 1)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.TRAIN,
@@ -66,8 +61,7 @@ def test_model_shape_train(sess, params):
 
 
 def test_model_shape_eval(sess, params):
-    params.slice_size += 1
-    features = make_inputs(params)
+    features = make_inputs(params, params.receptive_field + 1)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.EVAL,
@@ -80,7 +74,7 @@ def test_model_shape_eval(sess, params):
 
 
 def test_model_shape_predict(sess, params):
-    features = make_inputs(params)
+    features = make_inputs(params, params.receptive_field)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.PREDICT,
@@ -93,9 +87,8 @@ def test_model_shape_predict(sess, params):
 
 
 def test_conditioning_shape_train(sess, params):
-    params.slice_size += 1
     params.conditioning = True
-    features = make_inputs(params)
+    features = make_inputs(params, params.receptive_field + 1)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.TRAIN,
@@ -108,9 +101,8 @@ def test_conditioning_shape_train(sess, params):
 
 
 def test_conditioning_shape_eval(sess, params):
-    params.slice_size += 1
     params.conditioning = True
-    features = make_inputs(params)
+    features = make_inputs(params, params.receptive_field + 1)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.EVAL,
@@ -124,7 +116,7 @@ def test_conditioning_shape_eval(sess, params):
 
 def test_conditioning_shape_predict(sess, params):
     params.conditioning = True
-    features = make_inputs(params)
+    features = make_inputs(params, params.receptive_field)
     model = model_fn(
         features,
         tf.estimator.ModeKeys.PREDICT,

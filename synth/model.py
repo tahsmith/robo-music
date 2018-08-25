@@ -4,7 +4,6 @@ from attr import attrs, attrib
 
 @attrs
 class ModelParams:
-    slice_size = attrib()
     channels = attrib()
     dilation_stack_depth = attrib()
     dilation_stack_count = attrib()
@@ -221,7 +220,6 @@ def params_from_config():
     audio_config = config_dict['audio']
     synth_config = config_dict['synth']
     return ModelParams(
-        slice_size=synth_config['slice_size'],
         channels=audio_config['channels'],
         dilation_stack_depth=synth_config[
             'dilation_stack_depth'],
