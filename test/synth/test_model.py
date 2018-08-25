@@ -3,7 +3,7 @@ import pytest
 import tensorflow as tf
 
 from synth.model import ModelParams, model_fn, model_width
-from synth.prepare import mu_law_encode, mu_law_decode
+from synth.prepare import mu_law_encode, mu_law_decode, compute_features
 
 
 @pytest.fixture
@@ -155,7 +155,8 @@ def test_model_train(sess, params):
     sine_wave = np.sin(t * 2 * np.pi * t * freq)
     sine_wave = sine_wave[np.newaxis, :, np.newaxis]
     sine_wave_encoded = mu_law_encode(sine_wave, params.quantisation)
-    conditioning = np.random.randn(1, n_points, 1)
+    conditioning = compute_features(sine_wave, sample_rate,
+                                    params.feature_window, params.n_mels)
 
     print(params.receptive_field)
 
