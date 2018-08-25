@@ -86,7 +86,7 @@ def test_conditioning(sess):
                                 params.n_mels)
     model = model_fn(
         features,
-        tf.estimator.ModeKeys.PREDICT,
+        tf.estimator.ModeKeys.TRAIN,
         params
     )
 
