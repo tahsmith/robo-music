@@ -89,6 +89,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     waveform = tf.get_variable('waveform', shape=[slice_size, 1],
                                dtype=tf.int32)
     conditioning_tf = tf.Variable(conditioning, dtype=tf.float32)
+    initial_i = tf.get_variable('limit', shape=[], dtype=tf.int32)
     limit = tf.get_variable('limit', shape=[], dtype=tf.int32)
     params = params_from_config()
 
@@ -115,7 +116,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     while_op = tf.while_loop(
         cond,
         loop,
-        loop_vars=[0, waveform],
+        loop_vars=[initial_i, waveform],
         shape_invariants=[tf.TensorShape(()), tf.TensorShape([None, 1])],
         parallel_iterations=1
     )
@@ -133,7 +134,8 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     output_waveform = mu_law_encode(output_waveform, params.quantisation)
     steps = 11025
     for i in range(conditioning.shape[0] // steps):
-        sess.run(limit.assign(steps))
+        sess.run(initial_i.assign(i * steps))
+        sess.run(limit.assign((i + 1) * steps))
         sess.run(waveform.assign(output_waveform[-slice_size:, :]))
         while_op_result = sess.run(while_op)
         final_i, waveform_result = while_op_result
