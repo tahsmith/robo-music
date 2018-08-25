@@ -212,11 +212,11 @@ def file_shuffle(file_count):
     save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
-async def make_batch(output_path, params, i, x):
+async def make_batch(output_path, slice_size, params, i, x):
     slices, features = await asyncio.get_event_loop().run_in_executor(
         None,
         waveform_to_samples,
-        x, params
+        x, slice_size, params
     )
 
     save_array(slices, f'{output_path}/synth/waveform_{i}.npy')
@@ -229,20 +229,14 @@ async def make_batch(output_path, params, i, x):
 async def main():
     from config import config_dict
     synth_config = config_dict['synth']
-    audio_config = config_dict['audio']
     data_config = config_dict['data']
 
-    feature_window = synth_config['feature_window']
     slice_size = synth_config['slice_size']
-    quantisation = synth_config['quantisation']
-    channels = audio_config['channels']
-    sample_rate = audio_config['sample_rate']
-    n_mels = config_dict['classifier']['n_mels']
     augmentation = synth_config['sample_augmentation']
     augmentation_noise = synth_config['augmentation_noise']
     augmentation_scale_range = synth_config['augmentation_scale_range']
 
-    model_params = params_from_config()
+    params = params_from_config()
 
     cache_path = data_config['cache']
     input_files = list_input_files(cache_path)
@@ -255,8 +249,9 @@ async def main():
     chunk_size = chunk_size - chunk_size % slice_size
 
     def generate_waveforms():
-        return files_to_waveform_chunks(input_files, channels, chunk_size,
-                                        model_params.receptive_field,
+        return files_to_waveform_chunks(input_files, params.channels,
+                                        chunk_size,
+                                        params.receptive_field,
                                         augmentation,
                                         augmentation_noise,
                                         augmentation_scale_range)
@@ -266,7 +261,7 @@ async def main():
     except FileExistsError:
         pass
 
-    make_batch_part = partial(make_batch, cache_path, model_params)
+    make_batch_part = partial(make_batch, cache_path, slice_size, params)
     executor = ProcessPoolExecutor(int(config_dict['sys']['cpus']))
     loop = asyncio.get_event_loop()
     loop.set_default_executor(executor)
@@ -279,7 +274,7 @@ async def main():
     n_samples = sum(await processed)
 
     print("Summary:")
-    print('features  {}'.format(n_mels))
+    print('features  {}'.format(params.n_mels))
     print('samples   {}'.format(n_samples))
 
 
