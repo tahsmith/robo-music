@@ -89,7 +89,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     waveform = tf.get_variable('waveform', shape=[slice_size, 1],
                                dtype=tf.int32)
     conditioning_tf = tf.Variable(conditioning, dtype=tf.float32)
-    initial_i = tf.get_variable('limit', shape=[], dtype=tf.int32)
+    initial_i = tf.get_variable('initial_i', shape=[], dtype=tf.int32)
     limit = tf.get_variable('limit', shape=[], dtype=tf.int32)
     params = params_from_config()
 
