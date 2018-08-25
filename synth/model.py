@@ -44,6 +44,7 @@ def model_fn(features, mode, params):
             if conditioning is not None:
                 conditioning = conditioning[:, 1:, :]
 
+
         dilation_layers = [
             2 ** i
             for _ in range(params.dilation_stack_count)
@@ -135,9 +136,13 @@ def init_features(features, mode, params):
 
     if params.conditioning:
         if mode == tf.estimator.ModeKeys.PREDICT:
+            out_size = params.slice_size
             conditioning = features['conditioning']
         else:
+            out_size = params.slice_size - 1
             conditioning = features['conditioning'][:, :-1, :]
+        conditioning = tf.reshape(conditioning, (params.batch_count,
+                                                 out_size, params.n_mels))
     else:
         conditioning = None
 
