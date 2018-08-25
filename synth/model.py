@@ -35,9 +35,6 @@ def model_fn(features, mode, params):
             params.quantisation
         )
 
-        input_width = tf.shape(input_waveform)[1]
-        one_hot = tf.reshape(one_hot, [-1, input_width, params.quantisation])
-
         with tf.variable_scope('input_reshape'):
             output = tf.layers.conv1d(one_hot, kernel_size=2, strides=1,
                                       filters=params.residual_filters)
@@ -64,6 +61,7 @@ def model_fn(features, mode, params):
                     )
                 layers.append(skip)
 
+        input_width = tf.shape(input_waveform)[1]
         output_width = input_width - sum(dilation_layers) - 1
         output = sum([layer[:, -output_width:, :] for layer in layers])
 
@@ -130,10 +128,10 @@ def add_regularisation(loss, params):
 def init_features(features, mode, params: ModelParams):
     waveform = features['waveform']
     if mode == tf.estimator.ModeKeys.PREDICT:
-        out_size = params.slice_size
+        out_size = tf.shape(waveform)[1]
         input_waveform = waveform
     else:
-        out_size = params.slice_size - 1
+        out_size = tf.shape(waveform)[1] - 1
         input_waveform = waveform[:, :-1, :]
     input_waveform = tf.reshape(input_waveform, (-1, out_size, params.channels))
 
