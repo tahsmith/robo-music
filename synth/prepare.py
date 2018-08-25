@@ -169,7 +169,7 @@ def waveform_to_samples(waveform, params: ModelParams):
 
     waveform = quantise(waveform, params.quantisation)
 
-    stride = params.slice_size - params.receptive_field
+    stride = params.slice_size
     waveform = waveform_to_slices(waveform, params.slice_size, stride)
     features = waveform_to_slices(features, params.slice_size, stride)
 
