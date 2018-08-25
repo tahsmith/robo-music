@@ -46,7 +46,7 @@ def input_generator(waveform_files, feature_files, batch_size):
             end = begin + batch_size
             yield {
                 'waveform': waveform[begin:end, :, :],
-                'conditioning': features[begin:end, :]
+                'conditioning': features[begin:end, :, :]
             }
 
 
