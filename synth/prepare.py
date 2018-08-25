@@ -50,7 +50,7 @@ def quantise(x, quantisation):
 
 
 def compute_features(waveform, sample_rate, feature_window, n_mels):
-    waveform_padded = pad_waveform(waveform, feature_window - 1, 0, 0)
+    waveform_padded = pad_waveform(waveform, 0, feature_window - 1, 0)
 
     if waveform_padded.shape[1] == 1:
         waveform_padded = waveform_padded.reshape((-1))
