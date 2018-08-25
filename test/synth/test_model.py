@@ -152,13 +152,13 @@ def test_model_train(sess, params):
 
     t = np.arange(0, n_points) / sample_rate
     freq = 440
-    sine_wave = np.sin(t * 2 * np.pi * t * freq)
-    sine_wave = sine_wave[np.newaxis, :, np.newaxis]
-    sine_wave_encoded = mu_law_encode(sine_wave, params.quantisation)
+    sine_wave = np.sin(t * 2 * np.pi * t * freq).reshape((-1, 1))
     conditioning = compute_features(sine_wave, sample_rate,
                                     params.feature_window, params.n_mels)
+    sine_wave = sine_wave[np.newaxis, :, :]
+    conditioning = conditioning[np.newaxis, :, :]
 
-    print(params.receptive_field)
+    sine_wave_encoded = mu_law_encode(sine_wave, params.quantisation)
 
     train_spec = model_fn(
         {'waveform': tf.constant(sine_wave_encoded),
