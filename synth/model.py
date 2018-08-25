@@ -127,7 +127,7 @@ def add_regularisation(loss, params):
     return loss
 
 
-def init_features(features, mode, params):
+def init_features(features, mode, params: ModelParams):
     waveform = features['waveform']
     if mode == tf.estimator.ModeKeys.PREDICT:
         input_waveform = waveform
@@ -141,7 +141,7 @@ def init_features(features, mode, params):
         else:
             out_size = params.slice_size - 1
             conditioning = features['conditioning'][:, :-1, :]
-        conditioning = tf.reshape(conditioning, (params.batch_count,
+        conditioning = tf.reshape(conditioning, (-1,
                                                  out_size, params.n_mels))
     else:
         conditioning = None
