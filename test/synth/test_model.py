@@ -144,6 +144,7 @@ def test_conditioning_shape_predict(sess, params):
 
 @pytest.mark.skipif('not tf.test.is_gpu_available(cuda_only=True)')
 def test_model_train(sess, params):
+    params.conditioning = True
     sample_rate = 44100
     time_length = 1
     n_points = sample_rate * time_length
