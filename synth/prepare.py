@@ -63,7 +63,9 @@ def compute_features(waveform, sample_rate, feature_window, n_mels):
         S=spec,
         n_mels=n_mels
     )
-    spec = librosa.power_to_db(spec)
+
+    top_db = 80
+    spec = librosa.power_to_db(spec, top_db=top_db) / top_db
 
     spec = spec.transpose((1, 0)).astype(np.float32)
 
