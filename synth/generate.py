@@ -42,6 +42,9 @@ def regenerate(model_path, conditioning_file_path, output_path, n_mels,
                                                n_mels, sample_rate, slice_size,
                                                quantisation, time)
 
+    print(waveform.shape)
+    print(conditioning.shape)
+
     waveform = regenerate_with_conditioning(model_path, waveform, quantisation,
                                             conditioning,
                                             model_width(depth, count))
@@ -99,7 +102,7 @@ def regenerate_with_conditioning(model_path, init_waveform, quantisation,
     def loop(i, waveform_):
         features = {
             'waveform': waveform_[tf.newaxis, -slice_size:, :],
-            'conditioning': conditioning_tf[i:i + 1, :]
+            'conditioning': conditioning_tf[i:i + slice_size, :]
         }
 
         estimator_spec = model_fn(features, tf.estimator.ModeKeys.PREDICT,
