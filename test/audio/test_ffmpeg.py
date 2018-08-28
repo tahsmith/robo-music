@@ -16,11 +16,11 @@ def write_test_file(path):
 
 
 def test_write_sound_file(tmpdir):
-    write_test_file(tmpdir + '/test.mp3')
+    write_test_file(tmpdir + '/test.wav')
 
 
 def test_load_sound_file(tmpdir):
-    file_name = tmpdir + '/test.mp3'
+    file_name = tmpdir + '/test.wav'
     waveform_expected = write_test_file(file_name)
     waveform_actual = ffmpeg.load_sound_file(file_name, np.int16, 44100, 2)
     assert waveform_expected.shape == waveform_actual.shape

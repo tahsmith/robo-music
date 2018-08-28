@@ -63,7 +63,9 @@ def compute_features(waveform, params):
         S=spec,
         n_mels=params.n_mels
     )
-    spec = librosa.power_to_db(spec)
+
+    top_db = 80
+    spec = librosa.power_to_db(spec, top_db=top_db) / top_db
 
     spec = spec.transpose((1, 0)).astype(np.float32)
 
@@ -162,16 +164,16 @@ def files_to_waveform_chunks(file_list, channels, chunk_size, receptive_field,
             break
 
 
-def waveform_to_samples(waveform, params: ModelParams):
-    waveform = clip_to_slice_size(params.slice_size, waveform)
+def waveform_to_samples(waveform, slice_size, params: ModelParams):
+    waveform = clip_to_slice_size(slice_size, waveform)
     features = compute_features(waveform, params.sample_rate,
                                 params.feature_window, params.n_mels)
 
     waveform = quantise(waveform, params.quantisation)
 
-    stride = params.slice_size - params.receptive_field
-    waveform = waveform_to_slices(waveform, params.slice_size, stride)
-    features = waveform_to_slices(features, params.slice_size, stride)
+    stride = slice_size
+    waveform = waveform_to_slices(waveform, slice_size, stride)
+    features = waveform_to_slices(features, slice_size, stride)
 
     assert np.all(waveform <= 255)
     assert np.all(waveform >= 0)
@@ -210,11 +212,11 @@ def file_shuffle(file_count):
     save_array(features2, f'./cache/synth/features_{choice2}.npy')
 
 
-async def make_batch(output_path, params, i, x):
+async def make_batch(output_path, slice_size, params, i, x):
     slices, features = await asyncio.get_event_loop().run_in_executor(
         None,
         waveform_to_samples,
-        x, params
+        x, slice_size, params
     )
 
     save_array(slices, f'{output_path}/synth/waveform_{i}.npy')

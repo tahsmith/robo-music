@@ -21,15 +21,15 @@ synth:
   slice_size: 50000
   quantisation: 256
   batch_size: 3
-  steps: 5000
+  steps: 10000
   steps_per_eval: 500
   eval_steps: 100
-  conditioning: false
+  conditioning: true
   regularisation: false
   dropout: false
-  dilation_stack_depth: 10
+  dilation_stack_depth: 8
   dilation_stack_count: 5
   conv_filters: 32
   residual_filters: 32
-  skip_filters: 32
+  skip_filters: 64
   validation_file: './data/music/sample1.wav'

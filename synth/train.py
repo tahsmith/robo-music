@@ -66,7 +66,7 @@ def input_generator(waveform, feature, batch_size, params: ModelParams):
                 ),
                 params.quantisation
             )
-            feature_batch[i, :] = feature[start:end, :]
+            feature_batch[i, :] = feature[start:end, :, :]
 
         yield {
             'waveform': waveform_batch,
