@@ -34,7 +34,8 @@ def baseline_model(conditioning_features, quantisation, model_dir):
 
 
 def augment_sample(sample, noise_level=0.0, scale_range=1.0):
-    scale = scale_range ** tf.random_uniform((), -1.0, 1.0)
+    return sample
+    scale = scale_range ** tf.random_uniform((tf.shape(sample)[0],), -1.0, 1.0)
     noise = tf.random_normal(tf.shape(sample), noise_level)
 
     sample = scale * sample
@@ -111,8 +112,8 @@ def input_function_from_array(waveform, feature, params, slice_size,
                 'waveform': tf.TensorShape((slice_size, params.channels)),
                 'conditioning': tf.TensorShape((slice_size, params.n_mels))
             }
-        ).map(partial(normalise_and_augment, params=params), 4) \
-            .batch(batch_size) \
+        ).batch(batch_size) \
+            .map(partial(normalise_and_augment, params=params)) \
             .prefetch(1)
 
     return input_fn
