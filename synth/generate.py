@@ -73,9 +73,7 @@ def load_conditioning(channels, conditioning_file_path, n_mels, sample_rate,
 
     conditioning = compute_features(
         conditioning_waveform,
-        sample_rate,
-        slice_size,
-        n_mels
+        params=params_from_config()
     )
 
     conditioning_waveform = quantise(conditioning_waveform, quantisation)
