@@ -116,8 +116,7 @@ def test_model_train(sess, params):
     t = np.arange(0, n_points) / sample_rate
     freq = 440
     sine_wave = np.sin(t * 2 * np.pi * t * freq).reshape((-1, 1))
-    conditioning = compute_features(sine_wave, sample_rate,
-                                    params.feature_window, params.n_mels)
+    conditioning = compute_features(sine_wave, params)
     sine_wave = sine_wave[np.newaxis, :, :]
     conditioning = conditioning[np.newaxis, :, :]
 
