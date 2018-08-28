@@ -45,16 +45,17 @@ def augment_sample(sample, noise_level=0.0, scale_range=1.0):
     return sample
 
 
-def input_generator(waveform, feature, batch_size, params: ModelParams):
-    max_index = waveform.shape[0] - params.slice_size
+def input_generator(waveform, feature, slice_size, batch_size,
+                    params: ModelParams):
+    max_index = waveform.shape[0] - slice_size
     channels = waveform.shape[1]
     n_features = feature.shape[1]
     while True:
-        waveform_batch = np.empty((batch_size, params.slice_size, channels))
-        feature_batch = np.empty((batch_size, params.slice_size, n_features))
+        waveform_batch = np.empty((batch_size, slice_size, channels))
+        feature_batch = np.empty((batch_size, slice_size, n_features))
         for i in range(batch_size):
             start = int(np.random.uniform(0, max_index))
-            end = start + params.slice_size
+            end = start + slice_size
             waveform_batch[i, :] = mu_law_encode(
                 normalise_waveform(
                     augment_sample(
@@ -74,13 +75,14 @@ def input_generator(waveform, feature, batch_size, params: ModelParams):
         }
 
 
-def input_function_from_array(waveform, feature, params, batch_size,
+def input_function_from_array(waveform, feature, params, slice_size, batch_size,
                               prefetch):
     def input_fn():
         return tf.data.Dataset.from_generator(
-            partial(input_generator, waveform, feature, batch_size, params),
+            partial(input_generator, waveform, feature, slice_size,
+                    batch_size, params),
             {'waveform': tf.int32, 'conditioning': tf.float32}
-        ).prefetch(prefetch).repeat()
+        ).prefetch(1)
 
     return input_fn
 
@@ -131,6 +133,7 @@ def main(argv):
         train_waveform,
         train_features,
         params,
+        synth_config['slice_size'],
         batch_size,
         10,
     )
@@ -139,6 +142,7 @@ def main(argv):
         test_waveform,
         test_features,
         params,
+        synth_config['slice_size'],
         batch_size,
         10,
     )
