@@ -8,7 +8,6 @@ import tensorflow as tf
 import numpy as np
 
 from synth.model import params_from_config, ModelParams
-from synth.prepare import mu_law_encode, normalise_waveform
 from .model import model_fn
 from train_utils import train_and_test
 
@@ -35,39 +34,50 @@ def baseline_model(conditioning_features, quantisation, model_dir):
 
 
 def augment_sample(sample, noise_level=0.0, scale_range=1.0):
-    sample = sample.astype(np.float32)
-    scale = scale_range ** np.random.uniform(-1.0, 1.0)
-    noise = np.random.randn(*sample.shape) * noise_level
+    scale = scale_range ** tf.random_uniform((), -1.0, 1.0)
+    noise = tf.random_normal(tf.shape(sample), noise_level)
 
-    sample *= scale
-    sample += noise
+    sample = scale * sample
+    sample = noise + sample
 
     return sample
 
 
-def input_generator(waveform, feature, slice_size, batch_size,
-                    params: ModelParams):
+def normalise_waveform(waveform):
+    waveform = waveform - tf.reduce_mean(waveform)
+    waveform_range = tf.reduce_max(tf.abs(waveform))
+    waveform = waveform / waveform_range
+
+    return waveform
+
+
+def mu_law_encode(audio, quantization_channels):
+    '''Quantizes waveform amplitudes.'''
+    mu = quantization_channels - 1.0
+    # Perform mu-law companding transformation (ITU-T, 1988).
+    # Minimum operation is here to deal with rare large amplitudes caused
+    # by resampling.
+    mu_law = tf.sign(audio) * tf.log1p(mu * np.abs(audio)) / np.log1p(mu)
+    return tf.cast((mu_law + 1) / 2 * mu + 0.5, tf.int32)
+
+
+def quantise(x, quantisation):
+    if quantisation != 256:
+        raise NotImplementedError('quantisation != 256')
+    return mu_law_encode(x, quantisation)
+
+
+def random_slices(waveform, feature, slice_size,
+                  params: ModelParams):
     max_index = waveform.shape[0] - slice_size
     channels = waveform.shape[1]
-    n_features = feature.shape[1]
     while True:
-        waveform_batch = np.empty((batch_size, slice_size, channels))
-        feature_batch = np.empty((batch_size, slice_size, n_features))
-        for i in range(batch_size):
-            start = int(np.random.uniform(0, max_index))
-            end = start + slice_size
-            waveform_batch[i, :] = mu_law_encode(
-                normalise_waveform(
-                    augment_sample(
-                        waveform[start:end, :],
-                        0.01,
-                        1.2
-                    ),
-                    channels
-                ),
-                params.quantisation
-            )
-            feature_batch[i, :] = feature[start:end, :, :]
+        start = int(np.random.uniform(0, max_index))
+        end = start + slice_size
+
+        waveform_batch = waveform[start:end, :]
+
+        feature_batch = feature[start:end, :]
 
         yield {
             'waveform': waveform_batch,
@@ -75,14 +85,35 @@ def input_generator(waveform, feature, slice_size, batch_size,
         }
 
 
-def input_function_from_array(waveform, feature, params, slice_size, batch_size,
-                              prefetch):
+def normalise_and_augment(data_point, params):
+    return {
+        'waveform': quantise(
+            normalise_waveform(
+                augment_sample(
+                    data_point['waveform'],
+                    0.01,
+                    1.2
+                )
+            ),
+            params.quantisation
+        ),
+        'conditioning': data_point['conditioning']
+    }
+
+
+def input_function_from_array(waveform, feature, params, slice_size,
+                              batch_size):
     def input_fn():
         return tf.data.Dataset.from_generator(
-            partial(input_generator, waveform, feature, slice_size,
-                    batch_size, params),
-            {'waveform': tf.int32, 'conditioning': tf.float32}
-        ).prefetch(1)
+            partial(random_slices, waveform, feature, slice_size, params),
+            {'waveform': tf.float32, 'conditioning': tf.float32},
+            {
+                'waveform': tf.TensorShape((slice_size, params.channels)),
+                'conditioning': tf.TensorShape((slice_size, params.n_mels))
+            }
+        ).map(partial(normalise_and_augment, params=params), 4) \
+            .batch(batch_size) \
+            .prefetch(1)
 
     return input_fn
 
@@ -134,8 +165,7 @@ def main(argv):
         train_features,
         params,
         synth_config['slice_size'],
-        batch_size,
-        10,
+        batch_size
     )
 
     test_input_fn = input_function_from_array(
@@ -143,8 +173,7 @@ def main(argv):
         test_features,
         params,
         synth_config['slice_size'],
-        batch_size,
-        10,
+        batch_size
     )
 
     train_and_test(estimator, train_input_fn, test_input_fn,
