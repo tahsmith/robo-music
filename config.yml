@@ -24,7 +24,7 @@ synth:
   steps: 5000
   steps_per_eval: 500
   eval_steps: 100
-  conditioning: true
+  conditioning: false
   regularisation: false
   dropout: false
   dilation_stack_depth: 8
