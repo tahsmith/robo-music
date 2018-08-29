@@ -21,7 +21,7 @@ synth:
   slice_size: 25000
   quantisation: 256
   batch_size: 6
-  steps: 10000
+  steps: 5000
   steps_per_eval: 500
   eval_steps: 100
   conditioning: true
