@@ -21,15 +21,15 @@ synth:
   slice_size: 25000
   quantisation: 256
   batch_size: 6
-  steps: 5000
+  steps: 20000
   steps_per_eval: 500
   eval_steps: 100
   conditioning: false
   regularisation: false
   dropout: false
-  dilation_stack_depth: 10
+  dilation_stack_depth: 8
   dilation_stack_count: 5
   conv_filters: 32
   residual_filters: 32
-  skip_filters: 512
+  skip_filters: 64
   validation_file: '/var/local/robo-music-data/brian-eno-ambient-1-cut/music/Brian Eno - Ambient 1- Music for Airports [Full Album].mp3'
