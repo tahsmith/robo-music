@@ -6,13 +6,6 @@ from synth.model import ModelParams, model_fn, model_width
 from synth.prepare import mu_law_encode, mu_law_decode, compute_features
 
 
-@pytest.fixture
-def sess():
-    graph = tf.Graph()
-    with tf.Session(graph=graph) as sess:
-        yield sess
-
-
 def make_inputs(params, slice_size):
     return {
         'waveform': tf.constant(

@@ -34,9 +34,9 @@ def baseline_model(conditioning_features, quantisation, model_dir):
 
 
 def augment_sample(sample, noise_level=0.0, scale_range=1.0):
-    return sample
-    scale = scale_range ** tf.random_uniform((tf.shape(sample)[0],), -1.0, 1.0)
-    noise = tf.random_normal(tf.shape(sample), noise_level)
+    scale = scale_range ** tf.random_uniform((tf.shape(sample)[0], 1, 1), -1.0,
+                                             1.0)
+    noise = tf.random_normal(tf.shape(sample), 0.0, noise_level)
 
     sample = scale * sample
     sample = noise + sample

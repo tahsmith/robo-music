@@ -1,4 +1,5 @@
 import pytest
+import tensorflow as tf
 
 from synth.model import ModelParams
 
@@ -22,3 +23,10 @@ def params():
     )
 
     return params
+
+
+@pytest.fixture
+def sess():
+    graph = tf.Graph()
+    with tf.Session(graph=graph) as sess:
+        yield sess
