@@ -31,5 +31,5 @@ synth:
   dilation_stack_count: 5
   conv_filters: 32
   residual_filters: 32
-  skip_filters: 64
+  skip_filters: 512
   validation_file: '/var/local/robo-music-data/brian-eno-ambient-1-cut/music/Brian Eno - Ambient 1- Music for Airports [Full Album].mp3'
