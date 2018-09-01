@@ -27,7 +27,7 @@ synth:
   conditioning: false
   regularisation: false
   dropout: false
-  dilation_stack_depth: 8
+  dilation_stack_depth: 10
   dilation_stack_count: 5
   conv_filters: 32
   residual_filters: 32
