@@ -20,7 +20,7 @@ synth:
   feature_window: 2048
   slice_size: 25000
   quantisation: 256
-  batch_size: 12
+  batch_size: 9
   steps: 20000
   steps_per_eval: 500
   eval_steps: 100
