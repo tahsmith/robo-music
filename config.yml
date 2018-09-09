@@ -2,7 +2,7 @@ sys:
   cpus: 3
 
 data:
-  input: '/var/local/robo-music-data/brian-eno-ambient-1-cut'
+  input: './data'
   cache: './cache'
   logs: './logs'
 
@@ -32,4 +32,4 @@ synth:
   conv_filters: 32
   residual_filters: 32
   skip_filters: 64
-  validation_file: '/var/local/robo-music-data/brian-eno-ambient-1-cut/music/Brian Eno - Ambient 1- Music for Airports [Full Album].mp3'
+  validation_file: './data/music/sample1.wav'
